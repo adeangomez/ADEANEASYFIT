@@ -45,6 +45,21 @@
   li button{ width:auto; padding:6px 12px; font-size:11px; }
   .remember{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--faint); margin:-4px 0 14px; }
   .remember input{ width:auto; margin:0; }
+
+  select{
+    width:100%; background:var(--card2); border:1px solid var(--line); color:var(--text);
+    border-radius:9px; padding:11px 12px; font-size:14px; margin-bottom:12px; font-family:inherit;
+  }
+  select:focus{ outline:none; border-color:var(--iron); }
+
+  .hist-card{ background:var(--card2); border:1px solid var(--line); border-radius:11px; margin-bottom:8px; overflow:hidden; }
+  .hist-card-top{ display:flex; justify-content:space-between; align-items:center; padding:12px 14px; cursor:pointer; }
+  .hist-card-date{ font-family:monospace; font-size:11px; color:var(--faint); font-weight:700; margin-bottom:2px; }
+  .hist-card-day{ font-size:13.5px; font-weight:700; }
+  .chev{ color:var(--faint); font-size:18px; transition:transform .2s; }
+  .chev.open{ transform:rotate(90deg); color:var(--iron); }
+  .hist-card-detail{ border-top:1px solid var(--line); padding:12px 14px; background:var(--bg); }
+  .set-chip{ font-family:monospace; font-size:10.5px; font-weight:700; color:var(--dim); background:var(--card2); border:1px solid var(--line); border-radius:6px; padding:4px 7px; }
 </style>
 </head>
 <body>
@@ -78,6 +93,17 @@
   <button class="secondary" id="btnList">Actualizar lista</button>
   <ul id="userList" style="margin-top:14px;"></ul>
   <div class="msg" id="listMsg"></div>
+</div>
+
+<div class="card">
+  <h2>📊 Progreso de usuarios</h2>
+  <label>Selecciona un usuario</label>
+  <select id="progressUserSelect">
+    <option value="">— Elige un usuario —</option>
+  </select>
+  <button id="btnViewProgress">Ver progreso</button>
+  <div class="msg" id="progressMsg"></div>
+  <div id="userProgressResult"></div>
 </div>
 
 <script>
@@ -146,15 +172,25 @@ $("btnList").addEventListener("click", () => { persistIfNeeded(); loadUsers(); }
 async function loadUsers(){
   const msg = $("listMsg");
   const listEl = $("userList");
+  const selectEl = $("progressUserSelect");
   try{
     const data = await apiCall("/admin/users", { method:"GET" });
     listEl.innerHTML = "";
+
+    const prevSelected = selectEl.value;
+    selectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
+
     if(!data.users || data.users.length === 0){
       listEl.innerHTML = '<li style="color:var(--faint);">Todavía no hay usuarios creados.</li>';
     } else {
       data.users.forEach(u => {
         const username = typeof u === "string" ? u : u.username;
         const suspended = typeof u === "object" && u.suspended;
+
+        const opt = document.createElement("option");
+        opt.value = username;
+        opt.textContent = suspended ? `${username} (suspendido)` : username;
+        selectEl.appendChild(opt);
 
         const li = document.createElement("li");
         li.style.flexWrap = "wrap";
@@ -191,6 +227,7 @@ async function loadUsers(){
         li.appendChild(btnGroup);
         listEl.appendChild(li);
       });
+      if(prevSelected){ selectEl.value = prevSelected; }
     }
     msg.className = "msg";
   }catch(e){
@@ -226,6 +263,119 @@ async function deleteUser(username){
     alert("Error al eliminar: " + e.message);
   }
 }
+
+// -------------------- PROGRESO DE USUARIOS --------------------
+let adminExpandedIds = new Set();
+
+function exerciseVolume(sets){
+  return (sets || []).reduce((sum, s) => sum + (s.kg || 0) * (s.reps || 0), 0);
+}
+function fmtDateFull(iso){
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}-${mm}-${d.getFullYear()}`;
+}
+
+function buildLineChartSvg(values){
+  if(!values || values.length === 0){
+    return '<div style="color:var(--faint);font-size:12.5px;">Sin datos suficientes todavía.</div>';
+  }
+  const W = 560, H = 150, pad = 22;
+  const vals = values.length === 1 ? [values[0], values[0]] : values;
+  const max = Math.max(...vals, 1);
+  const min = Math.min(...vals, 0);
+  const range = (max - min) || 1;
+  const stepX = (W - pad * 2) / (vals.length - 1 || 1);
+  const pts = vals.map((v, i) => {
+    const x = pad + i * stepX;
+    const y = H - pad - ((v - min) / range) * (H - pad * 2);
+    return [x, y];
+  });
+  const pathD = pts.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  const areaD = pathD + ` L${pts[pts.length-1][0].toFixed(1)},${H-pad} L${pts[0][0].toFixed(1)},${H-pad} Z`;
+  const dots = pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="#ff5a2e"/>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;overflow:visible;display:block;">
+    <path d="${areaD}" fill="rgba(255,90,46,0.13)" stroke="none"/>
+    <path d="${pathD}" fill="none" stroke="#ff5a2e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    ${dots}
+  </svg>`;
+}
+
+function renderUserProgress(username, data){
+  const container = $("userProgressResult");
+  const sessions = (data.state && data.state.sessions) || [];
+
+  if(sessions.length === 0){
+    container.innerHTML = '<div style="color:var(--faint);font-size:13px;margin-top:14px;">Este usuario todavía no tiene sesiones guardadas.</div>';
+    return;
+  }
+
+  const volumes = sessions.map(s => s.exercises.reduce((sum, ex) => sum + exerciseVolume(ex.sets), 0));
+
+  let html = `<div style="margin-top:18px;">
+    <div style="font-size:11px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Volumen total por sesión (kg × reps) — evolución completa</div>
+    ${buildLineChartSvg(volumes)}
+  </div>`;
+
+  html += `<div style="margin-top:22px;font-size:11px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Historial (${sessions.length} sesión${sessions.length===1?'':'es'})</div>`;
+
+  [...sessions].reverse().forEach(sess => {
+    const isOpen = adminExpandedIds.has(sess.id);
+    html += `<div class="hist-card">
+      <div class="hist-card-top" data-toggle="${sess.id}">
+        <div>
+          <div class="hist-card-date">${fmtDateFull(sess.date)}</div>
+          <div class="hist-card-day">${sess.dayName}${sess.planName ? ` · ${sess.planName}` : ""}</div>
+        </div>
+        <span class="chev ${isOpen ? "open" : ""}">›</span>
+      </div>`;
+    if(isOpen){
+      html += `<div class="hist-card-detail">`;
+      sess.exercises.forEach(ex => {
+        html += `<div style="margin-bottom:9px;">
+          <div style="font-size:12px;font-weight:700;color:var(--dim);margin-bottom:5px;">${ex.name}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            ${ex.sets.map((s,i)=>`<span class="set-chip">S${i+1}: ${(s.kg>0||s.reps>0) ? `${s.kg}kg × ${s.reps}` : "—"}</span>`).join("")}
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
+  });
+
+  container.innerHTML = html;
+  container.querySelectorAll("[data-toggle]").forEach(el => {
+    el.addEventListener("click", () => {
+      const id = Number(el.dataset.toggle);
+      if(adminExpandedIds.has(id)) adminExpandedIds.delete(id);
+      else adminExpandedIds.add(id);
+      renderUserProgress(username, data);
+    });
+  });
+}
+
+$("btnViewProgress").addEventListener("click", async () => {
+  persistIfNeeded();
+  const username = $("progressUserSelect").value;
+  const msg = $("progressMsg");
+  const container = $("userProgressResult");
+  if(!username){
+    showMsg(msg, "Elige primero un usuario de la lista.", false);
+    return;
+  }
+  msg.className = "msg";
+  container.innerHTML = '<div style="color:var(--faint);font-size:13px;margin-top:14px;">Cargando…</div>';
+  try{
+    const data = await apiCall("/admin/user-data", { method:"POST", body: JSON.stringify({ username }) });
+    adminExpandedIds = new Set();
+    renderUserProgress(username, data);
+  }catch(e){
+    showMsg(msg, "Error: " + e.message, false);
+    container.innerHTML = "";
+  }
+});
 
 // cargar lista al abrir si ya hay clave guardada
 if($("adminKey") && $("adminKey").value){ loadUsers(); }
