@@ -116,6 +116,33 @@
   .col-heads span{ font-size:9.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint); text-align:center; font-weight:800; }
   .col-heads span:first-child{ visibility:hidden; }
 
+  /* Selector de ejercicios (biblioteca cerrada) */
+  .ex-picker-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .ex-picker-btn{
+    flex:1; display:flex; align-items:center; gap:10px; min-width:0;
+    background: var(--card-2); border:1px solid var(--line); border-radius:10px;
+    padding:7px 10px 7px 7px; cursor:pointer; text-align:left;
+  }
+  .ex-thumb{ width:34px; height:34px; border-radius:7px; object-fit:cover; background:#fff; flex-shrink:0; }
+  .ex-thumb-empty{ display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:16px; border:1px dashed var(--line); background:transparent; }
+  .ex-picker-label{ font-size:13.5px; color:var(--text); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ex-sets-field{ width:76px; flex-shrink:0; }
+  .ex-sets-field input{ width:100%; background: var(--card-2); border:1px solid var(--line); color:var(--text); border-radius:9px; padding:10px 8px; font-family:'JetBrains Mono'; font-size:14px; font-weight:600; text-align:center; }
+
+  .ex-search-input{ width:100%; background: var(--card-2); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:12px 14px; font-size:14.5px; margin-bottom:12px; font-family:'Inter'; }
+  .ex-search-input:focus{ outline:none; border-color: var(--iron); }
+  .ex-picker-grid{ overflow-y:auto; flex:1; margin-bottom:10px; }
+  .ex-picker-group-label{ font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint); margin:10px 0 8px; }
+  .ex-picker-cards{ display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+  .ex-picker-card{
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    background: var(--card-2); border:1px solid var(--line); border-radius:12px; padding:10px 8px; cursor:pointer;
+  }
+  .ex-picker-card:active{ border-color: var(--iron); }
+  .ex-picker-card img{ width:100%; aspect-ratio:1; object-fit:contain; background:#fff; border-radius:8px; }
+  .ex-picker-card span{ font-size:11.5px; font-weight:600; color:var(--text-dim); text-align:center; line-height:1.25; }
+  .ex-suggest-box{ border-top:1px solid var(--line-soft); padding-top:10px; margin-top:2px; }
+
   .last-time{ font-size:11px; color:var(--text-faint); padding: 0 16px 10px; margin-top:-4px; }
   .last-time b{ color:var(--steel); font-weight:700; }
 
@@ -240,7 +267,7 @@
 // ---------------------------------------------------------------------
 const DEFAULT_DAYS_SEED = [
   { name: "Torso A", sub: "Pecho · Espalda · Hombro", exercises: [
-    { name: "Pec dec / Aperturas de pecho", sets: 4 },
+    { name: "Aperturas de pecho en máquina", sets: 4 },
     { name: "Press militar con mancuernas", sets: 4 },
     { name: "Press plano con mancuernas", sets: 3 },
     { name: "Jalón al pecho", sets: 4 },
@@ -269,7 +296,7 @@ const DEFAULT_DAYS_SEED = [
   { name: "Torso B", sub: "Dominadas · Pecho · Brazos", exercises: [
     { name: "Dominadas", sets: 3 },
     { name: "Press inclinado en Smith", sets: 2 },
-    { name: "Pec dec / Aperturas de pecho", sets: 2 },
+    { name: "Aperturas de pecho en máquina", sets: 2 },
     { name: "Curl bíceps barra Z", sets: 2 },
     { name: "Curl tríceps unilateral (muñequera)", sets: 2 },
     { name: "Remo pronado (dorsal)", sets: 2 },
@@ -286,6 +313,31 @@ const DEFAULT_DAYS_SEED = [
     { name: "Rotaciones de oblicuos", sets: 3 },
   ]},
 ];
+
+// -------------------------------------------------------------------------
+// LIBRERÍA DE EJERCICIOS — lista cerrada. Solo estos aparecen en el selector
+// y son los únicos que la IA puede usar al generar rutinas. Las imágenes
+// viven en el repositorio (assets/ejercicios/) para no hinchar la app.
+// -------------------------------------------------------------------------
+const ASSETS_BASE = "https://adeangomez.github.io/ADEANEASYFIT/assets/ejercicios/";
+const EXERCISE_LIBRARY = [
+  { id: "aperturas-pecho-maquina",     name: "Aperturas de pecho en máquina", muscle: "Pecho" },
+  { id: "aperturas-pecho-poleas",      name: "Aperturas de pecho en poleas",  muscle: "Pecho" },
+  { id: "flexiones",                   name: "Flexiones",                    muscle: "Pecho" },
+  { id: "fondos-maquina",              name: "Fondos en máquina",            muscle: "Pecho" },
+  { id: "fondos-paralelas",            name: "Fondos en paralelas",          muscle: "Pecho" },
+  { id: "press-declinado-barra",       name: "Press declinado con barra",    muscle: "Pecho" },
+  { id: "press-pecho-maquina",         name: "Press de pecho en máquina",    muscle: "Pecho" },
+  { id: "press-inclinado-maquina",     name: "Press inclinado en máquina",   muscle: "Pecho" },
+  { id: "press-inclinado-mancuernas",  name: "Press inclinado con mancuernas", muscle: "Pecho" },
+  { id: "press-inclinado-smith",       name: "Press inclinado en Smith",     muscle: "Pecho" },
+  { id: "press-plano-mancuernas",      name: "Press plano con mancuernas",   muscle: "Pecho" },
+  { id: "press-plano-smith",           name: "Press plano en Smith",         muscle: "Pecho" },
+  { id: "pullover-mancuerna",          name: "Pull-over con mancuerna",      muscle: "Pecho" },
+  { id: "press-banca",                 name: "Press banca",                  muscle: "Pecho" },
+];
+function exerciseImgUrl(id){ return ASSETS_BASE + id + ".png"; }
+function findExerciseByName(name){ return EXERCISE_LIBRARY.find(e => e.name === name); }
 
 // -------------------- ICONOS (SVG en línea, sin emojis) --------------------
 const ICON_TRAIN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="9.5" width="3" height="5" rx="0.8"/><rect x="19.5" y="9.5" width="3" height="5" rx="0.8"/><rect x="5.3" y="7.5" width="2.4" height="9" rx="1"/><rect x="16.3" y="7.5" width="2.4" height="9" rx="1"/><line x1="7.7" y1="12" x2="16.3" y2="12"/></svg>`;
@@ -1258,9 +1310,13 @@ function renderPlanBuilder(){
       </div>
     `;
     day.exercises.forEach((ex, eIdx)=>{
-      html += `<div class="set-row" style="grid-template-columns: 1fr 70px 30px;margin-bottom:6px;">
-        <div class="field"><input type="text" class="ex-name-input" data-day="${dIdx}" data-ex="${eIdx}" placeholder="Nombre del ejercicio" value="${escapeAttr(ex.name)}"></div>
-        <div class="field"><input inputmode="numeric" class="ex-sets-input" data-day="${dIdx}" data-ex="${eIdx}" placeholder="3" value="${ex.sets}"><span class="unit">SETS</span></div>
+      const libEx = findExerciseByName(ex.name);
+      html += `<div class="ex-picker-row">
+        <button type="button" class="ex-picker-btn" data-day="${dIdx}" data-ex="${eIdx}">
+          ${libEx ? `<img src="${exerciseImgUrl(libEx.id)}" class="ex-thumb" alt="">` : `<span class="ex-thumb ex-thumb-empty">＋</span>`}
+          <span class="ex-picker-label">${ex.name ? escapeAttr(ex.name) : "Elegir ejercicio…"}</span>
+        </button>
+        <div class="field ex-sets-field"><input inputmode="numeric" class="ex-sets-input" data-day="${dIdx}" data-ex="${eIdx}" placeholder="3" value="${ex.sets}"><span class="unit">SETS</span></div>
         <button type="button" class="btn-text remove-ex-btn" data-day="${dIdx}" data-ex="${eIdx}" style="padding:6px;color:var(--text-faint);">✕</button>
       </div>`;
     });
@@ -1287,9 +1343,6 @@ function escapeAttr(s){
 function syncDraftFromDom(){
   document.querySelectorAll(".day-name-input").forEach(inp=>{
     planDraft.days[inp.dataset.day].name = inp.value;
-  });
-  document.querySelectorAll(".ex-name-input").forEach(inp=>{
-    planDraft.days[inp.dataset.day].exercises[inp.dataset.ex].name = inp.value;
   });
   document.querySelectorAll(".ex-sets-input").forEach(inp=>{
     const v = parseInt(inp.value, 10);
@@ -1328,12 +1381,137 @@ function wirePlanBuilderEvents(){
       renderPlanBuilder();
     });
   });
+  document.querySelectorAll(".ex-picker-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      syncDraftFromDom();
+      openExercisePicker(parseInt(btn.dataset.day,10), parseInt(btn.dataset.ex,10));
+    });
+  });
   document.getElementById("cancelPlanBtn").addEventListener("click", ()=>{
     planDraft = null;
     plansView = "list";
     renderPlans();
   });
   document.getElementById("savePlanBtn").addEventListener("click", onSavePlan);
+}
+
+// =======================================================================
+// SELECTOR DE EJERCICIOS (lista cerrada, con búsqueda y sugerencias)
+// =======================================================================
+let pickerTarget = null; // { dayIdx, exIdx }
+
+function openExercisePicker(dayIdx, exIdx){
+  pickerTarget = { dayIdx, exIdx };
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.id = "exercisePickerOverlay";
+  overlay.innerHTML = `
+    <div class="modal-sheet" style="max-height:82vh; display:flex; flex-direction:column;">
+      <h3>Elegir ejercicio</h3>
+      <input type="text" id="exSearchInput" placeholder="Buscar por nombre…" class="ex-search-input">
+      <div id="exPickerGrid" class="ex-picker-grid"></div>
+      <div class="ex-suggest-box">
+        <button type="button" class="btn-text" id="toggleSuggestBtn">¿No está el que buscas? Sugerir ejercicio nuevo</button>
+        <div id="suggestForm" style="display:none;">
+          <div class="field-group" style="margin-top:10px;">
+            <label>Nombre del ejercicio</label>
+            <input type="text" id="suggestNameInput" placeholder="p. ej. Press Arnold">
+          </div>
+          <div class="field-group">
+            <label>Grupo muscular (opcional)</label>
+            <input type="text" id="suggestMuscleInput" placeholder="p. ej. Hombro">
+          </div>
+          <button type="button" class="btn-primary" id="submitSuggestBtn" style="margin-top:4px;">Enviar sugerencia</button>
+          <div id="suggestMsg" class="hint" style="margin-top:8px;"></div>
+        </div>
+      </div>
+      <button type="button" class="btn-secondary" id="closePickerBtn">Cerrar</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeExercisePicker(); });
+  document.getElementById("closePickerBtn").addEventListener("click", closeExercisePicker);
+  document.getElementById("exSearchInput").addEventListener("input", (e)=>{
+    renderExercisePickerGrid(e.target.value);
+  });
+  document.getElementById("toggleSuggestBtn").addEventListener("click", ()=>{
+    const form = document.getElementById("suggestForm");
+    form.style.display = form.style.display === "none" ? "block" : "none";
+  });
+  document.getElementById("submitSuggestBtn").addEventListener("click", onSubmitSuggestion);
+  renderExercisePickerGrid("");
+}
+
+function closeExercisePicker(){
+  const overlay = document.getElementById("exercisePickerOverlay");
+  if(overlay) overlay.remove();
+  pickerTarget = null;
+}
+
+function renderExercisePickerGrid(query){
+  const grid = document.getElementById("exPickerGrid");
+  if(!grid) return;
+  const q = query.trim().toLowerCase();
+  const filtered = EXERCISE_LIBRARY.filter(e => !q || e.name.toLowerCase().includes(q));
+
+  if(filtered.length === 0){
+    grid.innerHTML = `<div class="hint" style="padding:16px 0;">Ningún ejercicio coincide con "${escapeAttr(query)}". Prueba a sugerirlo abajo.</div>`;
+    return;
+  }
+
+  // agrupar por musculo
+  const byMuscle = {};
+  filtered.forEach(e => { (byMuscle[e.muscle] = byMuscle[e.muscle] || []).push(e); });
+
+  let html = "";
+  Object.entries(byMuscle).forEach(([muscle, list])=>{
+    html += `<div class="ex-picker-group-label">${muscle}</div><div class="ex-picker-cards">`;
+    list.forEach(e=>{
+      html += `<button type="button" class="ex-picker-card" data-name="${escapeAttr(e.name)}">
+        <img src="${exerciseImgUrl(e.id)}" alt="" loading="lazy">
+        <span>${e.name}</span>
+      </button>`;
+    });
+    html += `</div>`;
+  });
+  grid.innerHTML = html;
+
+  grid.querySelectorAll(".ex-picker-card").forEach(card=>{
+    card.addEventListener("click", ()=>{
+      if(!pickerTarget) return;
+      selectExerciseForSlot(pickerTarget.dayIdx, pickerTarget.exIdx, card.dataset.name);
+    });
+  });
+}
+
+function selectExerciseForSlot(dayIdx, exIdx, exerciseName){
+  syncDraftFromDom();
+  planDraft.days[dayIdx].exercises[exIdx].name = exerciseName;
+  closeExercisePicker();
+  renderPlanBuilder();
+}
+
+async function onSubmitSuggestion(){
+  const nameInput = document.getElementById("suggestNameInput");
+  const muscleInput = document.getElementById("suggestMuscleInput");
+  const msg = document.getElementById("suggestMsg");
+  const name = nameInput.value.trim();
+  if(!name){ msg.textContent = "Escribe el nombre del ejercicio."; return; }
+
+  const btn = document.getElementById("submitSuggestBtn");
+  btn.disabled = true; btn.textContent = "Enviando…";
+  try{
+    await apiFetch("/suggest-exercise", {
+      method: "POST",
+      body: JSON.stringify({ name, muscle: muscleInput.value.trim() })
+    });
+    msg.textContent = "¡Gracias! Sugerencia enviada.";
+    nameInput.value = ""; muscleInput.value = "";
+  }catch(e){
+    msg.textContent = "No se pudo enviar: " + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "Enviar sugerencia";
+  }
 }
 
 async function onSavePlan(){
