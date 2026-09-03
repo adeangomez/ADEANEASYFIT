@@ -106,6 +106,13 @@
   <div id="userProgressResult"></div>
 </div>
 
+<div class="card">
+  <h2>💡 Sugerencias de ejercicios</h2>
+  <button class="secondary" id="btnLoadSuggestions">Actualizar</button>
+  <ul id="suggestionsList" style="margin-top:14px;"></ul>
+  <div class="msg" id="suggestionsMsg"></div>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
 
@@ -377,8 +384,48 @@ $("btnViewProgress").addEventListener("click", async () => {
   }
 });
 
+// -------------------- SUGERENCIAS DE EJERCICIOS --------------------
+async function loadSuggestions(){
+  const msg = $("suggestionsMsg");
+  const listEl = $("suggestionsList");
+  try{
+    const data = await apiCall("/admin/exercise-suggestions", { method: "GET" });
+    listEl.innerHTML = "";
+    if(!data.suggestions || data.suggestions.length === 0){
+      listEl.innerHTML = '<li style="color:var(--faint);">No hay sugerencias pendientes.</li>';
+    } else {
+      data.suggestions.forEach(s => {
+        const li = document.createElement("li");
+        li.style.flexWrap = "wrap";
+        li.style.alignItems = "flex-start";
+        const d = new Date(s.date);
+        const fecha = String(d.getDate()).padStart(2,"0") + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + d.getFullYear();
+        const info = document.createElement("div");
+        info.innerHTML = `<b>${s.name}</b>${s.muscle ? ` <span style="color:var(--faint);font-size:11px;">(${s.muscle})</span>` : ""}<br>
+          <span style="color:var(--faint);font-size:11px;">sugerido por ${s.suggestedBy} · ${fecha}</span>`;
+        li.appendChild(info);
+        const delBtn = document.createElement("button");
+        delBtn.className = "danger";
+        delBtn.textContent = "Descartar";
+        delBtn.addEventListener("click", async () => {
+          try{
+            await apiCall("/admin/dismiss-suggestion", { method:"POST", body: JSON.stringify({ id: s.id }) });
+            loadSuggestions();
+          }catch(e){ alert("Error: " + e.message); }
+        });
+        li.appendChild(delBtn);
+        listEl.appendChild(li);
+      });
+    }
+    msg.className = "msg";
+  }catch(e){
+    showMsg(msg, "Error: " + e.message, false);
+  }
+}
+$("btnLoadSuggestions").addEventListener("click", () => { persistIfNeeded(); loadSuggestions(); });
+
 // cargar lista al abrir si ya hay clave guardada
-if($("adminKey") && $("adminKey").value){ loadUsers(); }
+if($("adminKey") && $("adminKey").value){ loadUsers(); loadSuggestions(); }
 </script>
 </body>
 </html>
