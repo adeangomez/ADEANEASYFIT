@@ -45,9 +45,9 @@ Si estás pensando en entrenar conmigo o quieres saber cómo trabajo el seguimie
 
 ## 🎯 Sobre mí
 
-Entreno gimnasio, pádel de competición y running de forma combinada, y creo mis propias herramientas cuando las que existen no encajan con lo que necesito. Esta app es una muestra de esa forma de trabajar: **medir todo, no dejar nada a la improvisación.**
+Entreno gimnasio, pádel y running de forma combinada, y creo mis propias herramientas cuando las que existen no encajan con lo que necesito. Esta app es una muestra de esa forma de trabajar: **medir todo, no dejar nada a la improvisación.**
 
-Si buscas a alguien que se tome el entrenamiento — el tuyo o el suyo propio — con ese nivel de rigor, hablemos.
+Si buscas a alguien que se tome el entrenamiento  con ese nivel de rigor, hablemos.
 
 <div align="center">
 
