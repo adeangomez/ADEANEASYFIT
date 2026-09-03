@@ -156,6 +156,14 @@
   .delta.flat{ color:var(--flat); }
   .no-data{ font-size:12px; color:var(--text-faint); font-style:italic; }
 
+  /* Gráficas de evolución */
+  .chart-block{ margin-top:12px; padding-top:12px; border-top:1px solid var(--line-soft); }
+  .mini-chart{ width:100%; height:64px; display:block; }
+  .chart-caption{ display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-family:'JetBrains Mono'; font-size:10.5px; color:var(--text-faint); }
+  .chart-caption .up{ color:var(--up); font-weight:700; }
+  .chart-caption .down{ color:var(--down); font-weight:700; }
+  .chart-empty{ font-size:11.5px; color:var(--text-faint); font-style:italic; padding:8px 0; }
+
   /* IA */
   .ai-card{ margin-bottom:16px; }
   .ai-result{ margin-top:12px; background: var(--card); border:1px solid var(--line-soft); border-radius: var(--radius); padding:14px 16px; font-size:13.5px; line-height:1.6; color:var(--text-dim); }
@@ -797,6 +805,52 @@ async function onSaveSession(e){
 function exerciseVolume(sets){ return sets.reduce((sum,s)=> sum + (s.kg||0)*(s.reps||0), 0); }
 function exerciseMaxWeight(sets){ return sets.reduce((m,s)=> (s.kg||0) > m ? s.kg : m, 0); }
 
+// Serie cronológica completa de peso máximo para un ejercicio, a lo largo de todo el historial
+function buildExerciseTimeSeries(exerciseName){
+  const points = [];
+  state.sessions.forEach(sess=>{
+    const ex = sess.exercises.find(e => e.name === exerciseName);
+    if(ex){
+      const mx = exerciseMaxWeight(ex.sets);
+      if(mx > 0) points.push({ date: sess.date, maxKg: mx });
+    }
+  });
+  return points;
+}
+
+// Gráfica de línea en SVG, sin librerías externas. values: array de números.
+function buildLineChartSvg(values){
+  if(!values || values.length < 2){
+    return `<div class="chart-empty">Necesitas al menos 2 sesiones registradas de este ejercicio para ver la gráfica.</div>`;
+  }
+  const W = 100, H = 34, padY = 4;
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const range = (max - min) || 1;
+  const stepX = W / (values.length - 1);
+  const pts = values.map((v,i) => {
+    const x = i * stepX;
+    const y = H - padY - ((v - min) / range) * (H - padY * 2);
+    return [x, y];
+  });
+  const pathD = pts.map((p,i) => (i===0?"M":"L") + p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+  const areaD = pathD + ` L${pts[pts.length-1][0].toFixed(2)},${H} L0,${H} Z`;
+  const trendUp = values[values.length-1] >= values[0];
+  const lineColor = trendUp ? "#34c579" : "#ff5a2e";
+  const dotsLast = `<circle cx="${pts[pts.length-1][0].toFixed(2)}" cy="${pts[pts.length-1][1].toFixed(2)}" r="2.2" fill="${lineColor}"/>`;
+  return `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="mini-chart">
+      <path d="${areaD}" fill="${lineColor}" opacity="0.12" stroke="none"/>
+      <path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dotsLast}
+    </svg>
+    <div class="chart-caption">
+      <span>${min}kg</span>
+      <span class="${trendUp?'up':'down'}">${trendUp?'▲':'▼'} ${values[0]}kg → ${values[values.length-1]}kg</span>
+      <span>${max}kg</span>
+    </div>`;
+}
+
 function buildExerciseStats(windowType){
   const keyFn = windowType === "week" ? isoWeekKey : monthKey;
   const byExercise = {};
@@ -863,6 +917,7 @@ function renderProgress(){
   }
   const periodLabel = progressWindow === "week" ? "semana" : "mes";
   stats.forEach(st=>{
+    const series = buildExerciseTimeSeries(st.name).map(p => p.maxKg);
     html += `<div class="stat-card">
       <div class="stat-head"><h3>${st.name}</h3></div>
       <div class="stat-grid">
@@ -876,6 +931,10 @@ function renderProgress(){
           <div class="m-value">${st.last.maxKg} kg</div>
           ${deltaBlock(st.last.maxKg, st.prev ? st.prev.maxKg : null)}
         </div>
+      </div>
+      <div class="chart-block">
+        <div class="m-label" style="margin-bottom:6px;">Evolución del peso máximo (histórico completo)</div>
+        ${buildLineChartSvg(series)}
       </div>
     </div>`;
   });
