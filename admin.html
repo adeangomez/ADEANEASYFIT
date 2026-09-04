@@ -225,6 +225,12 @@ async function loadUsers(){
         }
         btnGroup.appendChild(toggleBtn);
 
+        const resetBtn = document.createElement("button");
+        resetBtn.className = "secondary";
+        resetBtn.textContent = "Restablecer contraseña";
+        resetBtn.addEventListener("click", () => resetPasswordUser(username));
+        btnGroup.appendChild(resetBtn);
+
         const delBtn = document.createElement("button");
         delBtn.className = "danger";
         delBtn.textContent = "Eliminar";
@@ -258,6 +264,21 @@ async function reactivateUser(username){
     loadUsers();
   }catch(e){
     alert("Error al reactivar: " + e.message);
+  }
+}
+
+async function resetPasswordUser(username){
+  const newPassword = prompt(`Nueva contraseña para "${username}" (mínimo 4 caracteres):`);
+  if(newPassword === null) return; // cancelado
+  if(!newPassword || newPassword.length < 4){
+    alert("La contraseña debe tener al menos 4 caracteres.");
+    return;
+  }
+  try{
+    await apiCall("/admin/reset-password", { method:"POST", body: JSON.stringify({ username, newPassword }) });
+    alert(`Contraseña de "${username}" restablecida correctamente. Comunícasela a la persona.`);
+  }catch(e){
+    alert("Error al restablecer la contraseña: " + e.message);
   }
 }
 
