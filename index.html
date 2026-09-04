@@ -46,6 +46,7 @@
     overscroll-behavior-y: none;
   }
   body{
+    padding-top: var(--safe-top);
     padding-bottom: calc(78px + var(--safe-bottom));
     min-height: 100vh;
   }
@@ -57,14 +58,7 @@
     padding: 20px 20px 16px;
     background: linear-gradient(180deg, var(--bg-elev), var(--bg));
     border-bottom: 1px solid var(--line-soft);
-    position: fixed; top: var(--safe-top); left:0; right:0; z-index: 20;
     box-shadow: 0 6px 18px -8px rgba(0,0,0,0.45);
-    -webkit-transform: translateY(0); transform: translateY(0);
-    transition: transform 0.25s ease;
-    will-change: transform;
-  }
-  header.top.header-hidden{
-    -webkit-transform: translateY(-110%); transform: translateY(-110%);
   }
   .brand{ display:flex; align-items:center; justify-content:flex-start; gap:0; }
   .brand h1{ font-size: 24px; margin:0; color:var(--text); line-height:1; text-transform:uppercase; }
@@ -100,7 +94,7 @@
     width:28px; height:2px; border-radius:0 0 3px 3px; background: var(--iron);
   }
 
-  main{ padding: 158px 16px 12px; max-width: 640px; margin: 0 auto; transition: opacity .12s ease; }
+  main{ padding: 20px 16px 12px; max-width: 640px; margin: 0 auto; transition: opacity .12s ease; }
 
   .section-title{ display:flex; align-items:center; justify-content:space-between; margin: 4px 2px 14px; }
   .section-title h2{ font-family:'Space Grotesk', sans-serif; font-size:21px; margin:0; color:var(--text); font-weight:700; letter-spacing:-0.01em; }
@@ -752,40 +746,7 @@ function renderApp(){
       }, 90);
     });
   });
-  setupFixedHeaderSpacing();
   render();
-}
-
-// La cabecera es position:fixed (más fiable que sticky en iOS). Esta función
-// mantiene el contenido de #main siempre por debajo de ella, midiendo su
-// altura real en cada cambio, para que nada quede tapado ni se vea "cortado".
-// Además, la esconde en cuanto empiezas a bajar y solo vuelve a aparecer
-// cuando llegas de nuevo arriba del todo — para que no se quede flotando
-// encima del contenido mientras navegas.
-function setupFixedHeaderSpacing(){
-  const header = document.querySelector("header.top");
-  const main = document.getElementById("main");
-  if(!header || !main) return;
-  const apply = () => { main.style.paddingTop = header.offsetHeight + "px"; };
-  apply();
-  if(window.ResizeObserver){
-    new ResizeObserver(apply).observe(header);
-  } else {
-    window.addEventListener("resize", apply);
-  }
-
-  const TOP_THRESHOLD = 8; // px — margen para considerar que "estás arriba del todo"
-  const updateVisibility = () => {
-    const h = document.querySelector("header.top");
-    if(!h) return;
-    if(window.scrollY <= TOP_THRESHOLD){
-      h.classList.remove("header-hidden");
-    } else {
-      h.classList.add("header-hidden");
-    }
-  };
-  updateVisibility();
-  window.addEventListener("scroll", updateVisibility, { passive: true });
 }
 
 function authScreenHtml(){
@@ -1111,8 +1072,11 @@ function lastTimeFor(exerciseName){
     const s = state.sessions[i];
     const ex = s.exercises.find(e => e.name === exerciseName);
     if(ex){
-      const best = ex.sets.reduce((m,s)=> (s.kg||0) > m ? (s.kg||0) : m, 0);
-      return { date: s.date, best };
+      let best = 0, bestReps = 0;
+      ex.sets.forEach(set => {
+        if((set.kg||0) > best){ best = set.kg||0; bestReps = set.reps||0; }
+      });
+      return { date: s.date, best, bestReps };
     }
   }
   return null;
@@ -1160,7 +1124,7 @@ function renderTrain(){
         </div>
       </div>`;
     if(last){
-      html += `<div class="last-time">Última vez (${fmtDate(last.date)}): mejor serie <b>${last.best} kg</b></div>`;
+      html += `<div class="last-time">Mejor serie: <b>${last.best} kg x ${last.bestReps}</b></div>`;
     }
     html += `<div class="col-heads"><span>#</span><span>Kg</span><span>Reps</span></div><div class="sets">`;
     for(let s=0; s<ex.sets; s++){
