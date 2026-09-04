@@ -276,6 +276,23 @@
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .modal-overlay{ position:fixed; inset:0; background: rgba(0,0,0,0.6); z-index:50; display:flex; align-items:flex-end; justify-content:center; }
   .modal-sheet{ width:100%; max-width:460px; background: var(--card); border-radius: 18px 18px 0 0; padding: 22px 20px calc(24px + var(--safe-bottom)); border-top:1px solid var(--line-soft); }
+  .legal-sheet{ max-height:88vh; display:flex; flex-direction:column; }
+  .legal-scroll{ overflow-y:auto; flex:1; margin: 10px 0 16px; padding-right:2px; }
+  .legal-section{ border-bottom:1px solid var(--line-soft); }
+  .legal-section:last-of-type{ border-bottom:none; }
+  .legal-section summary{
+    list-style:none; cursor:pointer; padding:13px 2px; font-family:'Space Grotesk',sans-serif; font-weight:700;
+    font-size:13.5px; color:var(--text); display:flex; align-items:center; justify-content:space-between;
+  }
+  .legal-section summary::-webkit-details-marker{ display:none; }
+  .legal-section summary::after{ content:"›"; color:var(--text-faint); transition:transform .2s; font-size:16px; }
+  .legal-section[open] summary::after{ transform:rotate(90deg); color:var(--iron); }
+  .legal-body{ padding:0 2px 16px; font-size:12.5px; line-height:1.65; color:var(--text-dim); }
+  .legal-body p{ margin:0 0 10px; }
+  .legal-body ul{ margin:0 0 10px; padding-left:18px; }
+  .legal-body li{ margin-bottom:4px; }
+  .legal-body b{ color:var(--text); }
+  .legal-disclaimer{ font-size:11px; color:var(--text-faint); font-style:italic; padding:14px 2px 2px; line-height:1.5; }
   .modal-sheet h3{ margin:0 0 4px; font-size:20px; }
   .modal-sheet .modal-sub{ font-size:12.5px; color:var(--text-faint); margin-bottom:20px; }
 
@@ -385,6 +402,15 @@ const EXERCISE_LIBRARY = [
   { id: "press-militar-maquina",       name: "Press militar en máquina",     muscle: "Hombro" },
   { id: "aperturas-hombro-maquina",    name: "Apertura de hombro en máquina", muscle: "Hombro" },
   { id: "press-arnold",                name: "Press Arnold",                 muscle: "Hombro" },
+  { id: "curl-barra-recta",            name: "Curl con barra recta",         muscle: "Bíceps" },
+  { id: "curl-barra-z",                name: "Curl con barra Z",             muscle: "Bíceps" },
+  { id: "curl-polea",                  name: "Curl en polea",                muscle: "Bíceps" },
+  { id: "curl-concentrado",            name: "Curl concentrado",             muscle: "Bíceps" },
+  { id: "curl-martillo",               name: "Curl martillo",                muscle: "Bíceps" },
+  { id: "curl-predicador-barra",       name: "Curl predicador con barra",    muscle: "Bíceps" },
+  { id: "curl-predicador-mancuernas",  name: "Curl predicador con mancuernas", muscle: "Bíceps" },
+  { id: "curl-predicador-maquina",     name: "Curl predicador en máquina",   muscle: "Bíceps" },
+  { id: "curl-mancuernas-alterno",     name: "Curl con mancuernas alterno",  muscle: "Bíceps" },
 ];
 function exerciseImgUrl(id){ return ASSETS_BASE + id + ".png"; }
 function findExerciseByName(name){ return EXERCISE_LIBRARY.find(e => e.name === name); }
@@ -832,6 +858,7 @@ function showAccountModal(){
         ${locked ? `${ICON_LOCK_INLINE} Podrás actualizar el peso en ${daysUntilWeightUpdate()} día${daysUntilWeightUpdate()===1?'':'s'}` : "Introducir peso en ayunas"}
       </button>
       <button class="btn-secondary" id="changePassBtn">Cambiar contraseña</button>
+      <button class="btn-secondary" id="legalBtn">Términos y avisos legales</button>
       <button class="btn-primary" id="logoutBtn" style="background:var(--card-2);color:var(--text);border:1px solid var(--line);margin-top:10px;">Cerrar sesión</button>
       <button class="btn-secondary" id="closeModalBtn">Cancelar</button>
     </div>
@@ -839,6 +866,10 @@ function showAccountModal(){
   document.body.appendChild(overlay);
   overlay.addEventListener("click", (e)=>{ if(e.target === overlay) overlay.remove(); });
   document.getElementById("closeModalBtn").addEventListener("click", ()=> overlay.remove());
+  document.getElementById("legalBtn").addEventListener("click", ()=>{
+    overlay.remove();
+    showLegalModal();
+  });
   document.getElementById("logoutBtn").addEventListener("click", async ()=>{
     overlay.remove();
     await apiLogout();
@@ -905,6 +936,75 @@ function showUpdateWeightModal(){
       btn.disabled = false; btn.textContent = "Guardar peso";
     }
   });
+}
+
+function showLegalModal(){
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-sheet legal-sheet">
+      <h3>Términos y avisos legales</h3>
+      <div class="modal-sub">Última actualización: ${new Date().toLocaleDateString("es-ES")}</div>
+      <div class="legal-scroll">
+
+        <details class="legal-section" open>
+          <summary>1. Aviso legal</summary>
+          <div class="legal-body">
+            <p>En cumplimiento de la Ley 34/2002, de 11 de julio, de Servicios de la Sociedad de la Información y de Comercio Electrónico (LSSI-CE), se informa de los siguientes datos:</p>
+            <p><b>Titular de la aplicación:</b> Adrián Gómez Carcedo<br>
+            <b>Contacto:</b> adeangomez873@gmail.com</p>
+            <p>Adeanfit es una aplicación de uso personal para el seguimiento de entrenamiento físico. El acceso está restringido a usuarios con cuenta creada por el administrador de la aplicación.</p>
+          </div>
+        </details>
+
+        <details class="legal-section">
+          <summary>2. Términos de uso</summary>
+          <div class="legal-body">
+            <p>El acceso y uso de esta aplicación atribuye la condición de usuario e implica la aceptación de estos términos. El uso está limitado a fines personales y no comerciales, salvo autorización expresa del titular.</p>
+            <p>El usuario se compromete a:</p>
+            <ul>
+              <li>No compartir sus credenciales de acceso con terceros.</li>
+              <li>No intentar acceder a datos de otros usuarios ni a partes restringidas del sistema.</li>
+              <li>Usar la aplicación de forma diligente y conforme a la ley, la moral y el orden público.</li>
+            </ul>
+            <p>El titular podrá suspender o cancelar el acceso de cualquier usuario en caso de incumplimiento de estos términos.</p>
+            <p><b>Sin garantía médica:</b> los contenidos de entrenamiento, las gráficas de progreso y los análisis generados (incluidos los realizados con inteligencia artificial) tienen una finalidad orientativa e informativa, y en ningún caso sustituyen el consejo de un profesional médico o del deporte cualificado.</p>
+          </div>
+        </details>
+
+        <details class="legal-section">
+          <summary>3. Propiedad intelectual e industrial</summary>
+          <div class="legal-body">
+            <p>El código fuente, el diseño, la estructura de navegación, las ilustraciones de ejercicios, los textos, los logotipos y demás elementos de esta aplicación son propiedad del titular o de terceros que han autorizado su uso, y están protegidos por la normativa española y de la Unión Europea en materia de propiedad intelectual, en particular por el Real Decreto Legislativo 1/1996, de 12 de abril, por el que se aprueba el texto refundido de la Ley de Propiedad Intelectual, y por la Directiva 2009/24/CE relativa a la protección jurídica de los programas de ordenador.</p>
+            <p><b>Queda expresamente prohibida</b> la reproducción, distribución, comunicación pública, transformación o puesta a disposición de la aplicación, de su código, de sus contenidos o de sus imágenes, total o parcialmente, por cualquier medio y en cualquier soporte, sin autorización previa y por escrito del titular.</p>
+            <p>El incumplimiento de lo anterior podrá dar lugar a las acciones legales que correspondan conforme a la legislación vigente.</p>
+          </div>
+        </details>
+
+        <details class="legal-section">
+          <summary>4. Protección de datos personales</summary>
+          <div class="legal-body">
+            <p>De conformidad con el Reglamento (UE) 2016/679 (RGPD) y la Ley Orgánica 3/2018, de Protección de Datos Personales y garantía de los derechos digitales (LOPDGDD):</p>
+            <p><b>Responsable del tratamiento:</b> Adrián Gómez Carcedo — adeangomez873@gmail.com</p>
+            <p><b>Datos tratados:</b> usuario, contraseña (almacenada cifrada), peso, altura, tiempo de experiencia entrenando, y datos de las sesiones de entrenamiento que el usuario registra (ejercicios, series, repeticiones y cargas).</p>
+            <p><b>Finalidad:</b> prestar el servicio de seguimiento de entrenamiento, calcular comparativas de progreso, y generar análisis mediante inteligencia artificial a partir de esos datos.</p>
+            <p><b>Base legal:</b> ejecución de la relación de uso solicitada por el propio usuario al utilizar la aplicación.</p>
+            <p><b>Conservación:</b> los datos se conservan mientras la cuenta permanezca activa. El titular puede eliminar una cuenta y sus datos asociados a petición del usuario.</p>
+            <p><b>Cesión a terceros:</b> los datos no se ceden a terceros, salvo obligación legal. El procesamiento de análisis con inteligencia artificial se realiza mediante infraestructura de Cloudflare (Workers AI), actuando como encargado del tratamiento.</p>
+            <p><b>Derechos:</b> el usuario puede ejercer sus derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad escribiendo a adeangomez873@gmail.com.</p>
+          </div>
+        </details>
+
+        <div class="legal-disclaimer">
+          Este es un texto de plantilla genérica orientado a un uso personal. Si esta aplicación pasa a tener un uso comercial o un volumen de usuarios mayor, se recomienda su revisión por un profesional del derecho.
+        </div>
+      </div>
+      <button class="btn-secondary" id="closeLegalBtn">Cerrar</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) overlay.remove(); });
+  document.getElementById("closeLegalBtn").addEventListener("click", ()=> overlay.remove());
 }
 
 function showChangePasswordModal(){
@@ -1820,6 +1920,7 @@ const MUSCLE_SYNONYMS = {
   "Pecho": ["pecho", "pectoral", "pectorales", "pecs", "chest"],
   "Espalda": ["espalda", "dorsal", "dorsales", "dorso", "back", "lat", "lats"],
   "Hombro": ["hombro", "hombros", "deltoide", "deltoides", "delt", "delts", "shoulder"],
+  "Bíceps": ["biceps", "bíceps", "brazo", "brazos", "curl", "arm", "arms", "bicep"],
 };
 function normalizeText(s){
   return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
