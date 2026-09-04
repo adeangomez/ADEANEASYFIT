@@ -144,6 +144,7 @@
   .ex-picker-row-item:active{ background: var(--iron-dim); }
   .ex-picker-row-item img{ width:44px; height:44px; object-fit:contain; background:#fff; border-radius:9px; flex-shrink:0; border:1px solid var(--line-soft); }
   .ex-picker-row-item .ex-row-name{ font-size:13.5px; font-weight:600; color:var(--text); flex:1; line-height:1.3; }
+  .ex-row-secondary{ font-size:10.5px; font-weight:600; color:var(--text-faint); }
   .ex-picker-row-item .ex-row-chevron{ color:var(--text-faint); flex-shrink:0; display:flex; }
   .ex-picker-row-item .ex-row-chevron svg{ width:16px; height:16px; }
   .ex-suggest-box{ border-top:1px solid var(--line-soft); padding-top:10px; margin-top:2px; }
@@ -351,7 +352,9 @@ const EXERCISE_LIBRARY = [
   { id: "remo-barra",                  name: "Remo con barra",               muscle: "Espalda" },
   { id: "remo-maquina",                name: "Remo en máquina",              muscle: "Espalda" },
   { id: "remo-t",                      name: "Remo en T",                    muscle: "Espalda" },
-  { id: "face-pull",                   name: "Face pull",                    muscle: "Espalda" },
+  { id: "face-pull",                   name: "Face pull",                    muscle: "Espalda", secondary: ["Hombro"] },
+  { id: "extension-lumbar",            name: "Extensión lumbar",             muscle: "Espalda" },
+  { id: "jalon-agarre-cerrado-supino", name: "Jalón con agarre cerrado supino", muscle: "Espalda" },
 ];
 function exerciseImgUrl(id){ return ASSETS_BASE + id + ".png"; }
 function findExerciseByName(name){ return EXERCISE_LIBRARY.find(e => e.name === name); }
@@ -1510,6 +1513,7 @@ function closeExercisePicker(){
 const MUSCLE_SYNONYMS = {
   "Pecho": ["pecho", "pectoral", "pectorales", "pecs", "chest"],
   "Espalda": ["espalda", "dorsal", "dorsales", "dorso", "back", "lat", "lats"],
+  "Hombro": ["hombro", "hombros", "deltoide", "deltoides", "shoulder"],
 };
 function normalizeText(s){
   return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -1518,8 +1522,11 @@ function exerciseMatchesQuery(e, q){
   if(!q) return true;
   const nq = normalizeText(q);
   if(normalizeText(e.name).includes(nq)) return true;
-  const syns = MUSCLE_SYNONYMS[e.muscle] || [];
-  return syns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s)));
+  const allMuscles = [e.muscle, ...(e.secondary||[])];
+  return allMuscles.some(m => {
+    const syns = MUSCLE_SYNONYMS[m] || [];
+    return syns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s)));
+  });
 }
 
 function renderExercisePickerGrid(query){
@@ -1543,7 +1550,7 @@ function renderExercisePickerGrid(query){
     list.forEach(e=>{
       html += `<button type="button" class="ex-picker-row-item" data-name="${escapeAttr(e.name)}">
         <img src="${exerciseImgUrl(e.id)}" alt="" loading="lazy">
-        <span class="ex-row-name">${e.name}</span>
+        <span class="ex-row-name">${e.name}${e.secondary && e.secondary.length ? ` <span class="ex-row-secondary">· también ${e.secondary.join(", ")}</span>` : ``}</span>
         <span class="ex-row-chevron">${ICON_CHEVRON}</span>
       </button>`;
     });
