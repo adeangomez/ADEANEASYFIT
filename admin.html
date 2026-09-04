@@ -307,6 +307,19 @@ const EXERCISE_LIBRARY = [
   { name: "Curl predicador con mancuernas", muscle: "Bíceps" },
   { name: "Curl predicador en máquina", muscle: "Bíceps" },
   { name: "Curl con mancuernas alterno", muscle: "Bíceps" },
+  { name: "Patada de tríceps en polea", muscle: "Tríceps" },
+  { name: "Extensión de tríceps trasnuca", muscle: "Tríceps" },
+  { name: "Patada de tríceps con mancuerna", muscle: "Tríceps" },
+  { name: "Press francés con barra Z", muscle: "Tríceps" },
+  { name: "Press de tríceps en máquina", muscle: "Tríceps" },
+  { name: "Flexión diamante de tríceps", muscle: "Tríceps" },
+  { name: "Fondos en máquina de tríceps", muscle: "Tríceps" },
+  { name: "Fondos libres de tríceps", muscle: "Tríceps" },
+  { name: "Press cerrado con barra", muscle: "Tríceps", secondary: ["Pecho"] },
+  { name: "Press francés con mancuernas", muscle: "Tríceps" },
+  { name: "Press francés en polea", muscle: "Tríceps" },
+  { name: "Extensión de tríceps en polea alta", muscle: "Tríceps" },
+  { name: "Press de tríceps unilateral en polea", muscle: "Tríceps" },
 ];
 function findExerciseByName(name){ return EXERCISE_LIBRARY.find(e => e.name === name); }
 
@@ -315,6 +328,7 @@ const MUSCLE_SYNONYMS = {
   "Espalda": ["espalda", "dorsal", "dorsales", "dorso", "back", "lat", "lats"],
   "Hombro": ["hombro", "hombros", "deltoide", "deltoides", "delt", "delts", "shoulder"],
   "Bíceps": ["biceps", "bíceps", "brazo", "brazos", "curl", "arm", "arms", "bicep"],
+  "Tríceps": ["triceps", "tríceps", "tricep"],
 };
 function normalizeText(s){
   return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
