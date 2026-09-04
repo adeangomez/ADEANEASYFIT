@@ -2,6 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -320,7 +323,7 @@ const DEFAULT_DAYS_SEED = [
     { name: "Press plano con mancuernas", sets: 3 },
     { name: "Jalón al pecho", sets: 4 },
     { name: "Press inclinado en Smith", sets: 2 },
-    { name: "Remo en T agarre superior", sets: 3 },
+    { name: "Remo en T", sets: 3 },
     { name: "Crunch abdominal", sets: 4 },
   ]},
   { name: "Brazos", sub: "Bíceps · Tríceps · Hombro", exercises: [
@@ -437,6 +440,7 @@ const ICON_TRAIN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_PROGRESS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,16 9,10 13,14 21,5"/><polyline points="15,5 21,5 21,11"/></svg>`;
 const ICON_PLANS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3.3a1 1 0 011-1h4a1 1 0 011 1V4"/><line x1="8" y1="10.5" x2="16" y2="10.5"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="17.5" x2="13" y2="17.5"/></svg>`;
 const ICON_HISTORY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><polyline points="12,9 12,13 14.8,14.8"/><line x1="9" y1="2" x2="15" y2="2"/></svg>`;
+const ICON_CARDIO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>`;
 const ICON_SPARKLE = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.7 5.9 5.9 1.7-5.9 1.7-1.7 5.9-1.7-5.9-5.9-1.7 5.9-1.7z"/></svg>`;
 const ICON_TRASH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a1 1 0 01-1 1H7a1 1 0 01-1-1L5 6"/><line x1="10" y1="10.5" x2="10" y2="17"/><line x1="14" y1="10.5" x2="14" y2="17"/></svg>`;
 const ICON_CHEVRON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,6 15,12 9,18"/></svg>`;
@@ -613,6 +617,48 @@ async function loadUserData(){
     state = { currentDayIndex: 0, sessions: [] };
     await syncToServer();
   }
+  await migrateExerciseNames();
+}
+
+// Algunas cuentas creadas antes de que la librería cerrada quedara fijada
+// pueden tener nombres de ejercicio antiguos guardados en sus rutinas y su
+// historial (p. ej. "Pec deck / Aperturas de pecho" en vez de "Aperturas de
+// pecho en máquina"). Esto rompe el enlace con la foto y las estadísticas
+// del ejercicio. Esta función los corrige de forma silenciosa al entrar.
+const EXERCISE_NAME_MIGRATIONS = {
+  "Pec deck / Aperturas de pecho": "Aperturas de pecho en máquina",
+  "Pec deck/Aperturas de pecho": "Aperturas de pecho en máquina",
+  "Pec deck / aperturas de pecho": "Aperturas de pecho en máquina",
+  "Pec deck": "Aperturas de pecho en máquina",
+  "Aperturas de pecho": "Aperturas de pecho en máquina",
+  "Remo en barra T": "Remo en T",
+  "Remo barra T": "Remo en T",
+  "Remo en T agarre superior": "Remo en T",
+  "Remo T": "Remo en T",
+};
+async function migrateExerciseNames(){
+  let changed = false;
+  const fix = (name) => EXERCISE_NAME_MIGRATIONS[name] || name;
+
+  (plans || []).forEach(plan => {
+    (plan.days || []).forEach(day => {
+      (day.exercises || []).forEach(ex => {
+        const fixed = fix(ex.name);
+        if(fixed !== ex.name){ ex.name = fixed; changed = true; }
+      });
+    });
+  });
+
+  if(state && Array.isArray(state.sessions)){
+    state.sessions.forEach(sess => {
+      (sess.exercises || []).forEach(ex => {
+        const fixed = fix(ex.name);
+        if(fixed !== ex.name){ ex.name = fixed; changed = true; }
+      });
+    });
+  }
+
+  if(changed) await syncToServer();
 }
 
 // -------------------- HELPERS DE FECHA --------------------
@@ -746,6 +792,7 @@ function renderApp(){
     <nav class="tabs">
       <button data-tab="train" class="active"><span class="ic">${ICON_TRAIN}</span>Entrenar</button>
       <button data-tab="progress"><span class="ic">${ICON_PROGRESS}</span>Progreso</button>
+      <button data-tab="cardio"><span class="ic">${ICON_CARDIO}</span>Cardio</button>
       <button data-tab="plans"><span class="ic">${ICON_PLANS}</span>Rutinas</button>
       <button data-tab="history"><span class="ic">${ICON_HISTORY}</span>Historial</button>
     </nav>
@@ -1244,10 +1291,24 @@ async function onSaveSession(e){
       })
     };
 
+    const newDayIndex = (state.currentDayIndex + 1) % days.length;
     state.sessions.push(session);
-    state.currentDayIndex = (state.currentDayIndex + 1) % days.length;
+    state.currentDayIndex = newDayIndex;
     lastSaveAt = Date.now();
     await syncToServer();
+
+    // Comprobación de seguridad: releemos del servidor para confirmar que el
+    // avance de día realmente se guardó, en vez de asumirlo a ciegas.
+    try{
+      const check = await apiGetData();
+      if(check && check.state && check.state.currentDayIndex !== newDayIndex){
+        console.warn("El día guardado no coincide con lo esperado, reintentando…");
+        await syncToServer();
+      }
+    }catch(e){
+      console.error("No se pudo verificar el guardado del día", e);
+    }
+
     render();
     window.scrollTo({top:0, behavior:"smooth"});
   } finally {
@@ -2069,11 +2130,19 @@ function render(){
   renderTrack();
   if(activeTab === "train") renderTrain();
   else if(activeTab === "progress") renderProgress();
+  else if(activeTab === "cardio") renderCardio();
   else if(activeTab === "plans") renderPlans();
   else renderHistory();
   document.querySelectorAll("nav.tabs button").forEach(b=>{
     b.classList.toggle("active", b.dataset.tab === activeTab);
   });
+}
+
+function renderCardio(){
+  document.getElementById("main").innerHTML = `<div class="empty">
+    <div class="empty-icon">${ICON_CARDIO}</div>
+    <div><b>Zona Cardio</b><br>Próximamente podrás registrar aquí tus ejercicios cardiovasculares (running, pádel, bici…) desde una librería cerrada, igual que ya haces con el gimnasio.</div>
+  </div>`;
 }
 
 // -------------------- INIT --------------------
