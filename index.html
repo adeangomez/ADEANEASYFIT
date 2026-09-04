@@ -46,7 +46,6 @@
     overscroll-behavior-y: none;
   }
   body{
-    padding-top: var(--safe-top);
     padding-bottom: calc(78px + var(--safe-bottom));
     min-height: 100vh;
   }
@@ -58,7 +57,8 @@
     padding: 20px 20px 16px;
     background: linear-gradient(180deg, var(--bg-elev), var(--bg));
     border-bottom: 1px solid var(--line-soft);
-    position: sticky; top:0; z-index: 20;
+    position: fixed; top: var(--safe-top); left:0; right:0; z-index: 20;
+    box-shadow: 0 6px 18px -8px rgba(0,0,0,0.45);
   }
   .brand{ display:flex; align-items:center; justify-content:flex-start; gap:0; }
   .brand h1{ font-size: 24px; margin:0; color:var(--text); line-height:1; text-transform:uppercase; }
@@ -233,7 +233,7 @@
   .field-group input:focus{ outline:none; border-color: var(--iron); }
 
   /* AUTH SCREEN */
-  body.auth-mode{ padding-bottom: var(--safe-bottom); }
+  body.auth-mode{ padding-bottom: var(--safe-bottom); padding-top: var(--safe-top); }
   .auth-wrap{ min-height: calc(100vh - 40px); display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 30px 24px; }
   .auth-logo{ width:96px; height:96px; border-radius:24px; margin-bottom:18px; box-shadow: 0 8px 30px rgba(255,90,46,0.25); }
   .auth-title{ font-size:34px; margin:0 0 4px; text-align:center; }
@@ -566,7 +566,24 @@ function renderApp(){
       window.scrollTo({top:0, behavior:"smooth"});
     });
   });
+  setupFixedHeaderSpacing();
   render();
+}
+
+// La cabecera es position:fixed (más fiable que sticky en iOS). Esta función
+// mantiene el contenido de #main siempre por debajo de ella, midiendo su
+// altura real en cada cambio, para que nada quede tapado ni se vea "cortado".
+function setupFixedHeaderSpacing(){
+  const header = document.querySelector("header.top");
+  const main = document.getElementById("main");
+  if(!header || !main) return;
+  const apply = () => { main.style.paddingTop = header.offsetHeight + "px"; };
+  apply();
+  if(window.ResizeObserver){
+    new ResizeObserver(apply).observe(header);
+  } else {
+    window.addEventListener("resize", apply);
+  }
 }
 
 function authScreenHtml(){
