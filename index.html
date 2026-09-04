@@ -229,7 +229,11 @@
   /* Formulario de creación de rutinas */
   .field-group{ margin-bottom:14px; }
   .field-group label{ display:block; font-size:11px; font-weight:800; letter-spacing:0.04em; text-transform:uppercase; color:var(--text-faint); margin-bottom:6px; }
-  .field-group input{ width:100%; background: var(--card-2); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:13px 14px; font-size:15px; font-family:'Inter'; }
+  .field-group input, .field-group select{ width:100%; background: var(--card-2); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:13px 14px; font-size:15px; font-family:'Inter'; }
+  .field-group select:focus{ outline:none; border-color: var(--iron); }
+  .gap-badge{ margin-top:8px; font-size:11px; font-weight:700; padding:7px 10px; border-radius:8px; text-align:center; }
+  .gap-badge.up{ background: rgba(52,197,121,0.12); color: var(--up); }
+  .gap-badge.down{ background: rgba(255,90,46,0.12); color: var(--iron); }
   .field-group input:focus{ outline:none; border-color: var(--iron); }
 
   /* AUTH SCREEN */
@@ -390,6 +394,38 @@ let activePlanId = null;
 let activeTab = "train";
 let progressWindow = "week";
 let progressSearchQuery = "";
+let userProfile = null; // { weightKg, heightCm, timeTraining, updatedAt }
+
+const TIME_BRACKETS = [
+  { id: "0-3",  label: "0-3 meses" },
+  { id: "3-6",  label: "3-6 meses" },
+  { id: "6-12", label: "6-12 meses" },
+  { id: "1-2a", label: "1-2 años" },
+  { id: "+2a",  label: "+2 años" },
+];
+function timeBracketLabel(id){
+  const b = TIME_BRACKETS.find(x => x.id === id);
+  return b ? b.label : id;
+}
+
+// Multiplicadores orientativos: 1RM esperado ≈ peso corporal (kg) × multiplicador,
+// según el tiempo entrenando. Son una referencia aproximada general (peso + tiempo
+// entrenando únicamente), no una medida clínica ni ajustada a caso individual.
+// Solo cubre los grandes básicos donde existen estándares de fuerza conocidos.
+const STRENGTH_STANDARDS = {
+  "Press banca":             { "0-3":0.50, "3-6":0.70, "6-12":0.90, "1-2a":1.15, "+2a":1.40 },
+  "Peso muerto":             { "0-3":0.75, "3-6":1.00, "6-12":1.35, "1-2a":1.75, "+2a":2.10 },
+  "Press militar con barra": { "0-3":0.35, "3-6":0.45, "6-12":0.55, "1-2a":0.70, "+2a":0.85 },
+  "Remo con barra":          { "0-3":0.45, "3-6":0.60, "6-12":0.75, "1-2a":0.95, "+2a":1.15 },
+};
+function computeExpectedMax(exerciseName){
+  if(!userProfile || !userProfile.weightKg || !userProfile.timeTraining) return null;
+  const table = STRENGTH_STANDARDS[exerciseName];
+  if(!table) return null;
+  const mult = table[userProfile.timeTraining];
+  if(!mult) return null;
+  return Math.round(userProfile.weightKg * mult * 2) / 2; // redondeo a 0.5kg
+}
 let plansView = "list";    // list | builder
 let planDraft = null;      // { name, days: [{name, exercises:[{name, sets}]}] }
 let aiGeneratedPlan = null; // plan propuesto por la IA, pendiente de revisar/guardar
@@ -467,7 +503,7 @@ async function apiGetData(){
 async function apiSaveData(){
   return apiFetch("/data", {
     method: "PUT",
-    body: JSON.stringify({ plans, activePlanId, state })
+    body: JSON.stringify({ plans, activePlanId, state, profile: userProfile })
   });
 }
 
@@ -484,6 +520,7 @@ async function syncToServer(){
 // Carga los datos del usuario ya autenticado; si no tiene nada aún, siembra la rutina clásica
 async function loadUserData(){
   const data = await apiGetData();
+  userProfile = (data && data.profile) ? data.profile : null;
   if(data && Array.isArray(data.plans) && data.plans.length > 0){
     plans = data.plans;
     activePlanId = data.activePlanId && plans.some(p=>p.id===data.activePlanId) ? data.activePlanId : plans[0].id;
@@ -522,13 +559,92 @@ function fmtDate(iso){
 // =======================================================================
 function initials(name){ return String(name||"").trim().slice(0,2).toUpperCase(); }
 
+function onboardingScreenHtml(){
+  const optionsHtml = TIME_BRACKETS.map(b => `<option value="${b.id}">${b.label}</option>`).join("");
+  return `
+    <div class="auth-wrap">
+      <img class="auth-logo" src="data:image/png;base64,${ICON_B64}" alt="Adeanfit">
+      <h1 class="auth-title display">ANTES DE EMPEZAR</h1>
+      <div class="auth-sub">Necesitamos estos datos para poder comparar tu progreso con la evolución esperada según tu experiencia. Solo se pide una vez.</div>
+      <div class="auth-card">
+        <div class="auth-error" id="onboardError"></div>
+        <form id="onboardForm">
+          <div class="field-group">
+            <label>Peso actual (kg)</label>
+            <input type="number" id="obWeight" step="0.1" min="30" max="300" placeholder="p. ej. 78">
+          </div>
+          <div class="field-group">
+            <label>Altura actual (cm)</label>
+            <input type="number" id="obHeight" step="1" min="120" max="230" placeholder="p. ej. 178">
+          </div>
+          <div class="field-group">
+            <label>Tiempo entrenando</label>
+            <select id="obTime">
+              <option value="">Selecciona…</option>
+              ${optionsHtml}
+            </select>
+          </div>
+          <button type="submit" class="btn-primary" id="onboardSubmit">Guardar y continuar</button>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+async function onOnboardSubmit(e){
+  e.preventDefault();
+  const errEl = document.getElementById("onboardError");
+  errEl.classList.remove("show");
+
+  const weight = parseFloat(document.getElementById("obWeight").value);
+  const height = parseFloat(document.getElementById("obHeight").value);
+  const time = document.getElementById("obTime").value;
+
+  if(!weight || weight < 30 || weight > 300){
+    errEl.textContent = "Introduce un peso válido (entre 30 y 300 kg).";
+    errEl.classList.add("show");
+    return;
+  }
+  if(!height || height < 120 || height > 230){
+    errEl.textContent = "Introduce una altura válida (entre 120 y 230 cm).";
+    errEl.classList.add("show");
+    return;
+  }
+  if(!time){
+    errEl.textContent = "Selecciona cuánto tiempo llevas entrenando.";
+    errEl.classList.add("show");
+    return;
+  }
+
+  const btn = document.getElementById("onboardSubmit");
+  btn.disabled = true; btn.textContent = "Guardando…";
+
+  userProfile = { weightKg: weight, heightCm: height, timeTraining: time, updatedAt: new Date().toISOString() };
+  try{
+    await apiSaveData();
+    renderApp();
+  }catch(e){
+    userProfile = null;
+    errEl.textContent = "No se pudo guardar: " + e.message;
+    errEl.classList.add("show");
+  } finally {
+    btn.disabled = false; btn.textContent = "Guardar y continuar";
+  }
+}
+
 function renderApp(){
   const app = document.getElementById("app");
-  document.body.classList.toggle("auth-mode", !currentUser);
+  document.body.classList.toggle("auth-mode", !currentUser || (currentUser && !userProfile));
 
   if(!currentUser){
     app.innerHTML = authScreenHtml();
     wireAuthEvents();
+    return;
+  }
+
+  if(!userProfile){
+    app.innerHTML = onboardingScreenHtml();
+    document.getElementById("onboardForm").addEventListener("submit", onOnboardSubmit);
     return;
   }
 
@@ -674,7 +790,7 @@ function showAccountModal(){
     overlay.remove();
     await apiLogout();
     clearLocalSession();
-    currentUser = null; authToken = null; state = null; plans = []; activePlanId = null;
+    currentUser = null; authToken = null; state = null; plans = []; activePlanId = null; userProfile = null;
     activeTab = "train";
     renderApp();
   });
@@ -920,13 +1036,14 @@ function buildExerciseTimeSeries(exerciseName){
 }
 
 // Gráfica de línea en SVG, sin librerías externas. values: array de números.
-function buildLineChartSvg(values){
+function buildLineChartSvg(values, expected){
   if(!values || values.length < 2){
     return `<div class="chart-empty">Necesitas al menos 2 sesiones registradas de este ejercicio para ver la gráfica.</div>`;
   }
   const W = 100, H = 34, padY = 4;
-  const max = Math.max(...values);
-  const min = Math.min(...values);
+  let max = Math.max(...values);
+  let min = Math.min(...values);
+  if(expected != null){ max = Math.max(max, expected); min = Math.min(min, expected); }
   const range = (max - min) || 1;
   const stepX = W / (values.length - 1);
   const pts = values.map((v,i) => {
@@ -939,17 +1056,39 @@ function buildLineChartSvg(values){
   const trendUp = values[values.length-1] >= values[0];
   const lineColor = trendUp ? "#34c579" : "#ff5a2e";
   const dotsLast = `<circle cx="${pts[pts.length-1][0].toFixed(2)}" cy="${pts[pts.length-1][1].toFixed(2)}" r="2.2" fill="${lineColor}"/>`;
-  return `
+
+  let expectedLine = "";
+  if(expected != null){
+    const ey = H - padY - ((expected - min) / range) * (H - padY * 2);
+    expectedLine = `<line x1="0" y1="${ey.toFixed(2)}" x2="${W}" y2="${ey.toFixed(2)}" stroke="#d9a441" stroke-width="1" stroke-dasharray="3,2" vector-effect="non-scaling-stroke"/>`;
+  }
+
+  const svg = `
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="mini-chart">
       <path d="${areaD}" fill="${lineColor}" opacity="0.12" stroke="none"/>
+      ${expectedLine}
       <path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>
       ${dotsLast}
-    </svg>
+    </svg>`;
+
+  const caption = `
     <div class="chart-caption">
       <span>${min}kg</span>
       <span class="${trendUp?'up':'down'}">${trendUp?'▲':'▼'} ${values[0]}kg → ${values[values.length-1]}kg</span>
       <span>${max}kg</span>
     </div>`;
+
+  let gapHtml = "";
+  if(expected != null){
+    const current = values[values.length-1];
+    const diff = current - expected;
+    const pct = (diff/expected)*100;
+    const cls = diff >= 0 ? "up" : "down";
+    const arrow = diff >= 0 ? "▲" : "▼";
+    gapHtml = `<div class="gap-badge ${cls}">${arrow} ${diff>=0?"+":""}${diff.toFixed(1)}kg frente a lo esperado para tu experiencia (${expected}kg) · ${pct>=0?"+":""}${pct.toFixed(0)}%</div>`;
+  }
+
+  return svg + caption + gapHtml;
 }
 
 function buildExerciseStats(windowType){
@@ -1001,7 +1140,16 @@ function statMatchesQuery(st, q){
   if(!q) return true;
   const nq = normalizeText(q);
   if(normalizeText(st.name).includes(nq)) return true;
-  return getExerciseDayNames(st.name).some(d => normalizeText(d).includes(nq));
+  if(getExerciseDayNames(st.name).some(d => normalizeText(d).includes(nq))) return true;
+  const libEx = findExerciseByName(st.name);
+  if(libEx){
+    const allMuscles = [libEx.muscle, ...(libEx.secondary||[])];
+    if(allMuscles.some(m => {
+      const syns = MUSCLE_SYNONYMS[m] || [];
+      return syns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s)));
+    })) return true;
+  }
+  return false;
 }
 
 function renderProgress(){
@@ -1012,7 +1160,7 @@ function renderProgress(){
       <button data-w="week" class="${progressWindow==='week'?'active':''}">Semanal</button>
       <button data-w="month" class="${progressWindow==='month'?'active':''}">Mensual</button>
     </div>
-    <input type="text" id="progressSearchInput" class="ex-search-input" placeholder="Buscar por ejercicio o por día (p. ej. 'Torso A')…" value="${escapeAttr(progressSearchQuery)}">
+    <input type="text" id="progressSearchInput" class="ex-search-input" placeholder="Buscar por ejercicio, día ('Torso A') o grupo ('pecho')…" value="${escapeAttr(progressSearchQuery)}">
     <div class="ai-card" id="aiAnalyzeCard">
       <button class="btn-ai" id="aiAnalyzeBtn"><span class="ic">${ICON_SPARKLE}</span>Analizar mi progreso con IA</button>
       <div id="aiAnalyzeResult"></div>
@@ -1047,6 +1195,7 @@ function renderProgress(){
   stats.forEach(st=>{
     const series = buildExerciseTimeSeries(st.name).map(p => p.maxKg);
     const dayNames = getExerciseDayNames(st.name);
+    const expected = computeExpectedMax(st.name);
     html += `<div class="stat-card">
       <div class="stat-head"><h3>${st.name}</h3></div>
       ${dayNames.length ? `<div class="stat-day-tags">${dayNames.map(d=>`<span class="stat-day-tag">${d}</span>`).join("")}</div>` : ``}
@@ -1063,8 +1212,8 @@ function renderProgress(){
         </div>
       </div>
       <div class="chart-block">
-        <div class="m-label" style="margin-bottom:6px;">Evolución del peso máximo (histórico completo)</div>
-        ${buildLineChartSvg(series)}
+        <div class="m-label" style="margin-bottom:6px;">Evolución del peso máximo (histórico completo)${expected!=null ? ' · con expectativa para tu experiencia' : ''}</div>
+        ${buildLineChartSvg(series, expected)}
       </div>
     </div>`;
   });
@@ -1698,7 +1847,7 @@ function render(){
       // token caducado o inválido: volver a pedir login
       console.warn("Sesión no válida, pidiendo login de nuevo.", e.message);
       clearLocalSession();
-      authToken = null; currentUser = null; state = null; plans = []; activePlanId = null;
+      authToken = null; currentUser = null; state = null; plans = []; activePlanId = null; userProfile = null;
     }
   }
   renderApp();
