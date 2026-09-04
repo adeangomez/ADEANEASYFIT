@@ -172,6 +172,8 @@
 
   .stat-card{ background: var(--card); border:1px solid var(--line-soft); border-radius: var(--radius); padding: 14px 16px; margin-bottom:12px; }
   .stat-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .stat-day-tags{ display:flex; flex-wrap:wrap; gap:5px; margin:-4px 0 10px; }
+  .stat-day-tag{ font-size:10px; font-weight:700; color:var(--steel); background:var(--card-2); border:1px solid var(--line-soft); border-radius:100px; padding:3px 9px; }
   .stat-head h3{ font-size:15.5px; margin:0; font-weight:700; }
   .stat-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
   .metric{ background: var(--card-2); border-radius:10px; padding:10px 12px; }
@@ -358,6 +360,7 @@ let plans = [];            // [{id, name, createdAt, days:[{name, sub, exercises
 let activePlanId = null;
 let activeTab = "train";
 let progressWindow = "week";
+let progressSearchQuery = "";
 let plansView = "list";    // list | builder
 let planDraft = null;      // { name, days: [{name, exercises:[{name, sets}]}] }
 let aiGeneratedPlan = null; // plan propuesto por la IA, pendiente de revisar/guardar
@@ -940,6 +943,21 @@ function deltaBlock(current, previous){
   return `<span class="delta ${cls}">${arrow} ${pct>0?"+":""}${pct.toFixed(1)}%</span>`;
 }
 
+function getExerciseDayNames(exerciseName){
+  const days = new Set();
+  state.sessions.forEach(sess=>{
+    if(sess.exercises.some(e => e.name === exerciseName)) days.add(sess.dayName);
+  });
+  return Array.from(days);
+}
+
+function statMatchesQuery(st, q){
+  if(!q) return true;
+  const nq = normalizeText(q);
+  if(normalizeText(st.name).includes(nq)) return true;
+  return getExerciseDayNames(st.name).some(d => normalizeText(d).includes(nq));
+}
+
 function renderProgress(){
   const main = document.getElementById("main");
   let html = `
@@ -948,6 +966,7 @@ function renderProgress(){
       <button data-w="week" class="${progressWindow==='week'?'active':''}">Semanal</button>
       <button data-w="month" class="${progressWindow==='month'?'active':''}">Mensual</button>
     </div>
+    <input type="text" id="progressSearchInput" class="ex-search-input" placeholder="Buscar por ejercicio o por día (p. ej. 'Torso A')…" value="${escapeAttr(progressSearchQuery)}">
     <div class="ai-card" id="aiAnalyzeCard">
       <button class="btn-ai" id="aiAnalyzeBtn"><span class="ic">${ICON_SPARKLE}</span>Analizar mi progreso con IA</button>
       <div id="aiAnalyzeResult"></div>
@@ -958,20 +977,33 @@ function renderProgress(){
       <div>Todavía no hay sesiones guardadas.<br>Completa tu primer entrenamiento en la pestaña <b>Entrenar</b> para empezar a ver tu evolución.</div></div>`;
     main.innerHTML = html;
     wireAiAnalyzeButton();
+    wireProgressSearch();
     return;
   }
-  const stats = buildExerciseStats(progressWindow);
-  if(stats.length === 0){
+  const allStats = buildExerciseStats(progressWindow);
+  const stats = allStats.filter(st => statMatchesQuery(st, progressSearchQuery));
+
+  if(allStats.length === 0){
     html += `<div class="empty"><div>Aún no hay datos suficientes para este periodo.</div></div>`;
     main.innerHTML = html;
     wireAiAnalyzeButton();
+    wireProgressSearch();
+    return;
+  }
+  if(stats.length === 0){
+    html += `<div class="empty"><div>Ningún ejercicio ni día coincide con "${escapeAttr(progressSearchQuery)}".</div></div>`;
+    main.innerHTML = html;
+    wireAiAnalyzeButton();
+    wireProgressSearch();
     return;
   }
   const periodLabel = progressWindow === "week" ? "semana" : "mes";
   stats.forEach(st=>{
     const series = buildExerciseTimeSeries(st.name).map(p => p.maxKg);
+    const dayNames = getExerciseDayNames(st.name);
     html += `<div class="stat-card">
       <div class="stat-head"><h3>${st.name}</h3></div>
+      ${dayNames.length ? `<div class="stat-day-tags">${dayNames.map(d=>`<span class="stat-day-tag">${d}</span>`).join("")}</div>` : ``}
       <div class="stat-grid">
         <div class="metric">
           <div class="m-label">Volumen (kg×reps) — última ${periodLabel}</div>
@@ -992,8 +1024,20 @@ function renderProgress(){
   });
   main.innerHTML = html;
   wireAiAnalyzeButton();
+  wireProgressSearch();
   main.querySelectorAll(".filter-row button").forEach(btn=>{
     btn.addEventListener("click", ()=>{ progressWindow = btn.dataset.w; renderProgress(); });
+  });
+}
+
+function wireProgressSearch(){
+  const input = document.getElementById("progressSearchInput");
+  if(!input) return;
+  input.addEventListener("input", (e)=>{
+    progressSearchQuery = e.target.value;
+    renderProgress();
+    const el = document.getElementById("progressSearchInput");
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   });
 }
 
