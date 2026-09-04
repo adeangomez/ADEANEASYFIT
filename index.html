@@ -355,6 +355,14 @@ const EXERCISE_LIBRARY = [
   { id: "face-pull",                   name: "Face pull",                    muscle: "Espalda", secondary: ["Hombro"] },
   { id: "extension-lumbar",            name: "Extensión lumbar",             muscle: "Espalda" },
   { id: "jalon-agarre-cerrado-supino", name: "Jalón con agarre cerrado supino", muscle: "Espalda" },
+  { id: "elevaciones-frontales-mancuernas", name: "Elevaciones frontales con mancuernas", muscle: "Hombro" },
+  { id: "pajaritos",                   name: "Pajaritos",                    muscle: "Hombro" },
+  { id: "pec-deck-posterior-invertido", name: "Pec deck posterior invertido", muscle: "Hombro", secondary: ["Espalda"] },
+  { id: "press-militar-mancuernas",    name: "Press militar con mancuernas", muscle: "Hombro" },
+  { id: "aperturas-hombro-poleas",     name: "Aperturas de hombro en poleas", muscle: "Hombro" },
+  { id: "aperturas-hombro",            name: "Aperturas de hombro",          muscle: "Hombro" },
+  { id: "press-militar-barra",         name: "Press militar con barra",      muscle: "Hombro" },
+  { id: "remo-vertical",               name: "Remo vertical",                muscle: "Hombro" },
 ];
 function exerciseImgUrl(id){ return ASSETS_BASE + id + ".png"; }
 function findExerciseByName(name){ return EXERCISE_LIBRARY.find(e => e.name === name); }
@@ -1513,7 +1521,7 @@ function closeExercisePicker(){
 const MUSCLE_SYNONYMS = {
   "Pecho": ["pecho", "pectoral", "pectorales", "pecs", "chest"],
   "Espalda": ["espalda", "dorsal", "dorsales", "dorso", "back", "lat", "lats"],
-  "Hombro": ["hombro", "hombros", "deltoide", "deltoides", "shoulder"],
+  "Hombro": ["hombro", "hombros", "deltoide", "deltoides", "delt", "delts", "shoulder"],
 };
 function normalizeText(s){
   return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
