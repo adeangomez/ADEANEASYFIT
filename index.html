@@ -1448,11 +1448,25 @@ function closeExercisePicker(){
   pickerTarget = null;
 }
 
+const MUSCLE_SYNONYMS = {
+  "Pecho": ["pecho", "pectoral", "pectorales", "pecs", "chest"],
+};
+function normalizeText(s){
+  return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+function exerciseMatchesQuery(e, q){
+  if(!q) return true;
+  const nq = normalizeText(q);
+  if(normalizeText(e.name).includes(nq)) return true;
+  const syns = MUSCLE_SYNONYMS[e.muscle] || [];
+  return syns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s)));
+}
+
 function renderExercisePickerGrid(query){
   const grid = document.getElementById("exPickerGrid");
   if(!grid) return;
-  const q = query.trim().toLowerCase();
-  const filtered = EXERCISE_LIBRARY.filter(e => !q || e.name.toLowerCase().includes(q));
+  const q = query.trim();
+  const filtered = EXERCISE_LIBRARY.filter(e => exerciseMatchesQuery(e, q));
 
   if(filtered.length === 0){
     grid.innerHTML = `<div class="hint" style="padding:16px 0;">Ningún ejercicio coincide con "${escapeAttr(query)}". Prueba a sugerirlo abajo.</div>`;
