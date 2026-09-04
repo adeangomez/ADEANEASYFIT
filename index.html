@@ -59,6 +59,8 @@
     border-bottom: 1px solid var(--line-soft);
     position: fixed; top: var(--safe-top); left:0; right:0; z-index: 20;
     box-shadow: 0 6px 18px -8px rgba(0,0,0,0.45);
+    -webkit-transform: translateZ(0); transform: translateZ(0); will-change: transform;
+    backface-visibility: hidden;
   }
   .brand{ display:flex; align-items:center; justify-content:flex-start; gap:0; }
   .brand h1{ font-size: 24px; margin:0; color:var(--text); line-height:1; text-transform:uppercase; }
@@ -94,7 +96,7 @@
     width:28px; height:2px; border-radius:0 0 3px 3px; background: var(--iron);
   }
 
-  main{ padding: 20px 16px 12px; max-width: 640px; margin: 0 auto; }
+  main{ padding: 158px 16px 12px; max-width: 640px; margin: 0 auto; transition: opacity .12s ease; }
 
   .section-title{ display:flex; align-items:center; justify-content:space-between; margin: 4px 2px 14px; }
   .section-title h2{ font-family:'Space Grotesk', sans-serif; font-size:21px; margin:0; color:var(--text); font-weight:700; letter-spacing:-0.01em; }
@@ -158,6 +160,7 @@
   .btn-primary:active{ transform: scale(0.985); }
   .btn-primary:disabled{ opacity:0.5; }
   .btn-secondary{ width:100%; background:var(--card-2); border:1px solid var(--line); color:var(--text-dim); padding:13px; border-radius:12px; font-size:13px; font-weight:600; margin-top:10px; cursor:pointer; }
+  .btn-secondary:disabled{ opacity:0.55; cursor:default; }
   .btn-text{ background:none; border:none; color: var(--iron); font-weight:600; font-size:13px; cursor:pointer; padding:8px; }
   .btn-ai{
     width:100%; display:flex; align-items:center; justify-content:center; gap:9px;
@@ -234,6 +237,16 @@
   .gap-badge{ margin-top:8px; font-size:11px; font-weight:700; padding:7px 10px; border-radius:8px; text-align:center; }
   .gap-badge.up{ background: rgba(52,197,121,0.12); color: var(--up); }
   .gap-badge.down{ background: rgba(255,90,46,0.12); color: var(--iron); }
+
+  .reminder-card{
+    display:flex; align-items:center; gap:12px; background: linear-gradient(135deg, var(--iron-dim), var(--card));
+    border:1px solid rgba(255,90,46,0.3); border-radius: var(--radius); padding:13px 14px; margin-bottom:16px; position:relative;
+  }
+  .reminder-icon{ width:32px; height:32px; flex-shrink:0; color: var(--iron); background: var(--card-2); border-radius:9px; display:flex; align-items:center; justify-content:center; }
+  .reminder-icon svg{ width:17px; height:17px; }
+  .reminder-text{ flex:1; font-size:12px; color:var(--text-dim); line-height:1.4; }
+  .reminder-action{ background: var(--iron); color:#1a0b06; border:none; padding:8px 12px; border-radius:9px; font-size:11.5px; font-weight:700; white-space:nowrap; cursor:pointer; }
+  .reminder-close{ position:absolute; top:8px; right:9px; background:none; border:none; color:var(--text-faint); font-size:13px; cursor:pointer; padding:4px; }
   .field-group input:focus{ outline:none; border-color: var(--iron); }
 
   /* AUTH SCREEN */
@@ -382,6 +395,8 @@ const ICON_HISTORY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 const ICON_SPARKLE = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.7 5.9 5.9 1.7-5.9 1.7-1.7 5.9-1.7-5.9-5.9-1.7 5.9-1.7z"/></svg>`;
 const ICON_TRASH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a1 1 0 01-1 1H7a1 1 0 01-1-1L5 6"/><line x1="10" y1="10.5" x2="10" y2="17"/><line x1="14" y1="10.5" x2="14" y2="17"/></svg>`;
 const ICON_CHEVRON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,6 15,12 9,18"/></svg>`;
+const ICON_LOCK_INLINE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:inline-block;vertical-align:-2px;margin-right:4px;"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>`;
+const ICON_SCALE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 8h8M12 8v8M8.5 12a3.5 3.5 0 007 0"/></svg>`;
 
 const API_BASE = "https://adeanfit-api.adeangomez873.workers.dev";
 const AUTH_TOKEN_KEY = "adeanfit_auth_token";
@@ -395,6 +410,7 @@ let activeTab = "train";
 let progressWindow = "week";
 let progressSearchQuery = "";
 let userProfile = null; // { weightKg, heightCm, timeTraining, updatedAt }
+let weightReminderDismissed = false;
 
 const TIME_BRACKETS = [
   { id: "0-3",  label: "0-3 meses" },
@@ -425,6 +441,21 @@ function computeExpectedMax(exerciseName){
   const mult = table[userProfile.timeTraining];
   if(!mult) return null;
   return Math.round(userProfile.weightKg * mult * 2) / 2; // redondeo a 0.5kg
+}
+
+// -------------------- CANDADO DE 7 DÍAS PARA ACTUALIZAR EL PESO --------------------
+const WEIGHT_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
+function canUpdateWeight(){
+  if(!userProfile || !userProfile.weightUpdatedAt) return true;
+  return (Date.now() - new Date(userProfile.weightUpdatedAt).getTime()) >= WEIGHT_COOLDOWN_MS;
+}
+function daysUntilWeightUpdate(){
+  if(!userProfile || !userProfile.weightUpdatedAt) return 0;
+  const elapsed = Date.now() - new Date(userProfile.weightUpdatedAt).getTime();
+  const remainingMs = WEIGHT_COOLDOWN_MS - elapsed;
+  if(remainingMs <= 0) return 0;
+  return Math.ceil(remainingMs / (24*60*60*1000));
 }
 let plansView = "list";    // list | builder
 let planDraft = null;      // { name, days: [{name, exercises:[{name, sets}]}] }
@@ -619,7 +650,7 @@ async function onOnboardSubmit(e){
   const btn = document.getElementById("onboardSubmit");
   btn.disabled = true; btn.textContent = "Guardando…";
 
-  userProfile = { weightKg: weight, heightCm: height, timeTraining: time, updatedAt: new Date().toISOString() };
+  userProfile = { weightKg: weight, heightCm: height, timeTraining: time, weightUpdatedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   try{
     await apiSaveData();
     renderApp();
@@ -677,9 +708,16 @@ function renderApp(){
   document.getElementById("accountPill").addEventListener("click", showAccountModal);
   document.querySelectorAll("nav.tabs button").forEach(btn=>{
     btn.addEventListener("click", ()=>{
+      if(btn.dataset.tab === activeTab) return;
       activeTab = btn.dataset.tab;
-      render();
+      const main = document.getElementById("main");
+      if(main){ main.style.opacity = "0"; }
       window.scrollTo({top:0, behavior:"smooth"});
+      setTimeout(()=>{
+        render();
+        const m = document.getElementById("main");
+        if(m){ m.style.opacity = "1"; }
+      }, 90);
     });
   });
   setupFixedHeaderSpacing();
@@ -774,10 +812,23 @@ async function onAuthSubmit(e){
 function showAccountModal(){
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
+  const locked = !canUpdateWeight();
+  let weightLine = "";
+  if(userProfile && userProfile.weightKg){
+    weightLine = `Peso actual: <b>${userProfile.weightKg} kg</b>`;
+    if(userProfile.weightUpdatedAt){
+      const daysAgo = Math.floor((Date.now() - new Date(userProfile.weightUpdatedAt).getTime()) / (24*60*60*1000));
+      weightLine += ` <span style="color:var(--text-faint);">· actualizado hace ${daysAgo} día${daysAgo===1?'':'s'}</span>`;
+    }
+  }
   overlay.innerHTML = `
     <div class="modal-sheet">
       <h3>${currentUser}</h3>
       <div class="modal-sub">Sesión iniciada en este dispositivo</div>
+      ${weightLine ? `<div class="hint" style="text-align:left;margin-top:-8px;margin-bottom:14px;">${weightLine}</div>` : ``}
+      <button class="btn-secondary" id="updateWeightBtn" ${locked ? "disabled" : ""}>
+        ${locked ? `${ICON_LOCK_INLINE} Podrás actualizar el peso en ${daysUntilWeightUpdate()} día${daysUntilWeightUpdate()===1?'':'s'}` : "Introducir peso en ayunas"}
+      </button>
       <button class="btn-secondary" id="changePassBtn">Cambiar contraseña</button>
       <button class="btn-primary" id="logoutBtn" style="background:var(--card-2);color:var(--text);border:1px solid var(--line);margin-top:10px;">Cerrar sesión</button>
       <button class="btn-secondary" id="closeModalBtn">Cancelar</button>
@@ -790,13 +841,67 @@ function showAccountModal(){
     overlay.remove();
     await apiLogout();
     clearLocalSession();
-    currentUser = null; authToken = null; state = null; plans = []; activePlanId = null; userProfile = null;
+    currentUser = null; authToken = null; state = null; plans = []; activePlanId = null; userProfile = null; weightReminderDismissed = false;
     activeTab = "train";
     renderApp();
   });
   document.getElementById("changePassBtn").addEventListener("click", ()=>{
     overlay.remove();
     showChangePasswordModal();
+  });
+  if(!locked){
+    document.getElementById("updateWeightBtn").addEventListener("click", ()=>{
+      overlay.remove();
+      showUpdateWeightModal();
+    });
+  }
+}
+
+function showUpdateWeightModal(){
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <h3>Introducir peso en ayunas</h3>
+      <div class="modal-sub">Pésate nada más levantarte, antes de comer o beber, para que el dato sea comparable con el anterior.</div>
+      <div class="auth-error" id="weightError"></div>
+      <form id="weightForm">
+        <div class="field-group">
+          <label>Peso actual (kg)</label>
+          <input type="number" id="newWeightInput" step="0.1" min="30" max="300" placeholder="p. ej. 76.5" value="${userProfile && userProfile.weightKg ? userProfile.weightKg : ''}">
+        </div>
+        <button type="submit" class="btn-primary" id="weightSubmitBtn">Guardar peso</button>
+        <button type="button" class="btn-secondary" id="weightCancelBtn">Cancelar</button>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) overlay.remove(); });
+  document.getElementById("weightCancelBtn").addEventListener("click", ()=> overlay.remove());
+  document.getElementById("weightForm").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const errEl = document.getElementById("weightError");
+    errEl.classList.remove("show");
+    const weight = parseFloat(document.getElementById("newWeightInput").value);
+    if(!weight || weight < 30 || weight > 300){
+      errEl.textContent = "Introduce un peso válido (entre 30 y 300 kg).";
+      errEl.classList.add("show");
+      return;
+    }
+    const btn = document.getElementById("weightSubmitBtn");
+    btn.disabled = true; btn.textContent = "Guardando…";
+    try{
+      userProfile.weightKg = weight;
+      userProfile.weightUpdatedAt = new Date().toISOString();
+      await apiSaveData();
+      overlay.remove();
+      render();
+    }catch(err){
+      errEl.textContent = "No se pudo guardar: " + err.message;
+      errEl.classList.add("show");
+    } finally {
+      btn.disabled = false; btn.textContent = "Guardar peso";
+    }
   });
 }
 
@@ -903,7 +1008,18 @@ function renderTrain(){
   if(state.currentDayIndex >= days.length) state.currentDayIndex = 0;
   const day = days[state.currentDayIndex];
   const main = document.getElementById("main");
-  let html = `
+  let html = "";
+  if(canUpdateWeight() && userProfile && userProfile.weightUpdatedAt && !weightReminderDismissed){
+    html += `<div class="reminder-card" id="weightReminderCard">
+      <div class="reminder-icon">${ICON_SCALE}</div>
+      <div class="reminder-text">
+        <b>Ya puedes actualizar tu peso.</b><br>Pésate en ayunas y actualízalo para un seguimiento más preciso.
+      </div>
+      <button type="button" class="reminder-action" id="weightReminderBtn">Actualizar</button>
+      <button type="button" class="reminder-close" id="weightReminderClose">✕</button>
+    </div>`;
+  }
+  html += `
     <div class="section-title">
       <h2>${day.name}</h2>
       <span class="pill">${day.sub}</span>
@@ -940,6 +1056,13 @@ function renderTrain(){
   main.innerHTML = html;
   document.getElementById("sessionForm").addEventListener("submit", onSaveSession);
   startSaveCooldownTimer();
+  const reminderBtn = document.getElementById("weightReminderBtn");
+  if(reminderBtn) reminderBtn.addEventListener("click", ()=> showUpdateWeightModal());
+  const reminderClose = document.getElementById("weightReminderClose");
+  if(reminderClose) reminderClose.addEventListener("click", ()=>{
+    weightReminderDismissed = true;
+    document.getElementById("weightReminderCard")?.remove();
+  });
 }
 
 function startSaveCooldownTimer(){
@@ -1847,7 +1970,7 @@ function render(){
       // token caducado o inválido: volver a pedir login
       console.warn("Sesión no válida, pidiendo login de nuevo.", e.message);
       clearLocalSession();
-      authToken = null; currentUser = null; state = null; plans = []; activePlanId = null; userProfile = null;
+      authToken = null; currentUser = null; state = null; plans = []; activePlanId = null; userProfile = null; weightReminderDismissed = false;
     }
   }
   renderApp();
