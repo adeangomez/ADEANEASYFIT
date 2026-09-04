@@ -67,16 +67,35 @@
   .hist-card-detail{ border-top:1px solid var(--line); padding:12px 14px; background:var(--bg); }
   .set-chip{ font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:700; color:var(--dim); background:var(--card2); border:1px solid var(--line); border-radius:6px; padding:4px 7px; }
 
-  details.conn-details{ background:var(--card); border:1px solid var(--line-soft); border-radius:14px; margin-bottom:16px; overflow:hidden; }
-  details.conn-details summary{
-    list-style:none; cursor:pointer; padding:16px 18px; display:flex; align-items:center; gap:10px;
-    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:13.5px; color:var(--dim);
+  .admin-tabs{ display:flex; gap:8px; margin-bottom:18px; }
+  .admin-tabs button{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:5px;
+    background:var(--card); border:1px solid var(--line-soft); color:var(--faint);
+    padding:12px 6px; border-radius:12px; font-size:11px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.02em; cursor:pointer; font-family:'Inter',sans-serif;
   }
-  details.conn-details summary::-webkit-details-marker{ display:none; }
-  details.conn-details summary svg{ width:16px; height:16px; color:var(--faint); flex-shrink:0; }
-  details.conn-details summary .chev-summary{ margin-left:auto; transition:transform .2s; }
-  details.conn-details[open] summary .chev-summary{ transform:rotate(90deg); }
-  details.conn-details .conn-body{ padding:0 18px 18px; }
+  .admin-tabs button svg{ width:19px; height:19px; }
+  .admin-tabs button.tab-active{ color:var(--iron); border-color:rgba(255,90,46,.35); background:var(--iron-dim); }
+  .admin-section{ animation: fadeIn .15s ease; }
+  @keyframes fadeIn{ from{ opacity:0; } to{ opacity:1; } }
+
+  .prog-search{
+    width:100%; background:var(--card2); border:1px solid var(--line); color:var(--text);
+    border-radius:9px; padding:11px 12px; font-size:14px; margin:14px 0 6px; font-family:inherit;
+  }
+  .prog-search:focus{ outline:none; border-color:var(--iron); }
+  .stat-card{ background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px; }
+  .stat-card h3{ font-size:14px; margin:0 0 6px; font-family:'Space Grotesk',sans-serif; font-weight:700; }
+  .stat-day-tags{ display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; }
+  .stat-day-tag{ font-size:9.5px; font-weight:700; color:var(--dim); background:var(--card); border:1px solid var(--line); border-radius:100px; padding:3px 8px; }
+  .mini-chart{ width:100%; height:64px; display:block; }
+  .chart-caption{ display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--faint); }
+  .chart-caption .up{ color:var(--up); font-weight:700; }
+  .chart-caption .down{ color:var(--down); font-weight:700; }
+  .gap-badge{ margin-top:8px; font-size:10.5px; font-weight:700; padding:6px 9px; border-radius:8px; text-align:center; }
+  .gap-badge.up{ background:rgba(52,197,121,.12); color:var(--up); }
+  .gap-badge.down{ background:rgba(242,80,79,.12); color:var(--iron); }
+  .chart-empty{ font-size:11px; color:var(--faint); font-style:italic; padding:8px 0; }
 </style>
 </head>
 <body>
@@ -84,13 +103,9 @@
 <h1><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Adeanfit — Administración</h1>
 <div class="sub">Crear y gestionar cuentas de usuario de la app. Solo tú deberías tener esta página.</div>
 
-<details class="conn-details">
-  <summary>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
-    Conexión
-    <span class="chev-summary">›</span>
-  </summary>
-  <div class="conn-body">
+<div id="connView">
+  <div class="card">
+    <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>Conexión</h2>
     <label>URL del servidor (Worker)</label>
     <input id="workerUrl" value="https://adeanfit-api.adeangomez873.workers.dev" />
     <label>Tu clave de administrador</label>
@@ -98,42 +113,70 @@
     <div class="remember">
       <input type="checkbox" id="rememberKey" /> Recordar clave en este navegador
     </div>
+    <button id="btnConnect">Entrar</button>
+    <div class="msg" id="connMsg"></div>
   </div>
-</details>
-
-<div class="card">
-  <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Crear usuario nuevo</h2>
-  <label>Usuario</label>
-  <input id="newUsername" placeholder="p. ej. adrian" />
-  <label>Contraseña</label>
-  <input id="newPassword" type="text" placeholder="mínimo 4 caracteres" />
-  <button id="btnCreate">Crear usuario</button>
-  <div class="msg" id="createMsg"></div>
 </div>
 
-<div class="card">
-  <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Usuarios existentes</h2>
-  <button class="secondary" id="btnList">Actualizar lista</button>
-  <ul id="userList" style="margin-top:14px;"></ul>
-  <div class="msg" id="listMsg"></div>
-</div>
+<div id="mainView" style="display:none;">
 
-<div class="card">
-  <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,17 9,11 13,15 21,6"/><polyline points="15,6 21,6 21,12"/></svg>Progreso de usuarios</h2>
-  <label>Selecciona un usuario</label>
-  <select id="progressUserSelect">
-    <option value="">— Elige un usuario —</option>
-  </select>
-  <button id="btnViewProgress">Ver progreso</button>
-  <div class="msg" id="progressMsg"></div>
-  <div id="userProgressResult"></div>
-</div>
+  <nav class="admin-tabs">
+    <button data-section="users" class="tab-active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+      Usuarios
+    </button>
+    <button data-section="progress">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,17 9,11 13,15 21,6"/><polyline points="15,6 21,6 21,12"/></svg>
+      Progreso
+    </button>
+    <button data-section="suggestions">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.7 5.9 5.9 1.7-5.9 1.7-1.7 5.9-1.7-5.9-5.9-1.7 5.9-1.7z"/></svg>
+      Ideas
+    </button>
+  </nav>
 
-<div class="card">
-  <h2><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.7 5.9 5.9 1.7-5.9 1.7-1.7 5.9-1.7-5.9-5.9-1.7 5.9-1.7z"/></svg>Sugerencias de ejercicios</h2>
-  <button class="secondary" id="btnLoadSuggestions">Actualizar</button>
-  <ul id="suggestionsList" style="margin-top:14px;"></ul>
-  <div class="msg" id="suggestionsMsg"></div>
+  <div id="section-users" class="admin-section">
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Crear usuario nuevo</h2>
+      <label>Usuario</label>
+      <input id="newUsername" placeholder="p. ej. adrian" />
+      <label>Contraseña</label>
+      <input id="newPassword" type="text" placeholder="mínimo 4 caracteres" />
+      <button id="btnCreate">Crear usuario</button>
+      <div class="msg" id="createMsg"></div>
+    </div>
+
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Usuarios existentes</h2>
+      <button class="secondary" id="btnList">Actualizar lista</button>
+      <ul id="userList" style="margin-top:14px;"></ul>
+      <div class="msg" id="listMsg"></div>
+    </div>
+  </div>
+
+  <div id="section-progress" class="admin-section" style="display:none;">
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,17 9,11 13,15 21,6"/><polyline points="15,6 21,6 21,12"/></svg>Progreso de usuarios</h2>
+      <label>Selecciona un usuario</label>
+      <select id="progressUserSelect">
+        <option value="">— Elige un usuario —</option>
+      </select>
+      <button id="btnViewProgress">Ver progreso</button>
+      <div class="msg" id="progressMsg"></div>
+      <div id="userProgressResult"></div>
+    </div>
+  </div>
+
+  <div id="section-suggestions" class="admin-section" style="display:none;">
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.7 5.9 5.9 1.7-5.9 1.7-1.7 5.9-1.7-5.9-5.9-1.7 5.9-1.7z"/></svg>Sugerencias de ejercicios</h2>
+      <button class="secondary" id="btnLoadSuggestions">Actualizar</button>
+      <ul id="suggestionsList" style="margin-top:14px;"></ul>
+      <div class="msg" id="suggestionsMsg"></div>
+    </div>
+  </div>
+
+  <button class="secondary" id="btnDisconnect" style="margin-top:6px;">Cambiar de cuenta / clave</button>
 </div>
 
 <script>
@@ -176,6 +219,181 @@ async function apiCall(path, options={}){
   const data = await res.json().catch(()=>({}));
   if(!res.ok) throw new Error(data.error || ("Error HTTP " + res.status));
   return data;
+}
+
+// -------------------- ACCESO --------------------
+$("btnConnect").addEventListener("click", async () => {
+  const msg = $("connMsg");
+  if(!$("workerUrl").value.trim() || !$("adminKey").value){
+    showMsg(msg, "Rellena la URL y la clave de administrador.", false);
+    return;
+  }
+  const btn = $("btnConnect");
+  btn.disabled = true; btn.textContent = "Comprobando…";
+  try{
+    await apiCall("/admin/users", { method: "GET" });
+    persistIfNeeded();
+    $("connView").style.display = "none";
+    $("mainView").style.display = "block";
+    loadUsers();
+    loadSuggestions();
+  }catch(e){
+    showMsg(msg, "No se pudo conectar: " + e.message, false);
+  } finally {
+    btn.disabled = false; btn.textContent = "Entrar";
+  }
+});
+
+$("btnDisconnect").addEventListener("click", () => {
+  $("mainView").style.display = "none";
+  $("connView").style.display = "block";
+});
+
+// -------------------- PESTAÑAS --------------------
+document.querySelectorAll(".admin-tabs button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".admin-tabs button").forEach(b => b.classList.remove("tab-active"));
+    btn.classList.add("tab-active");
+    document.querySelectorAll(".admin-section").forEach(s => s.style.display = "none");
+    $("section-" + btn.dataset.section).style.display = "block";
+  });
+});
+
+// -------------------- LIBRERÍA DE EJERCICIOS (igual que en la app) --------------------
+const EXERCISE_LIBRARY = [
+  { name: "Aperturas de pecho en máquina", muscle: "Pecho" },
+  { name: "Aperturas de pecho en poleas", muscle: "Pecho" },
+  { name: "Flexiones", muscle: "Pecho" },
+  { name: "Fondos en máquina", muscle: "Pecho" },
+  { name: "Fondos en paralelas", muscle: "Pecho" },
+  { name: "Press declinado con barra", muscle: "Pecho" },
+  { name: "Press de pecho en máquina", muscle: "Pecho" },
+  { name: "Press inclinado en máquina", muscle: "Pecho" },
+  { name: "Press inclinado con mancuernas", muscle: "Pecho" },
+  { name: "Press inclinado en Smith", muscle: "Pecho" },
+  { name: "Press plano con mancuernas", muscle: "Pecho" },
+  { name: "Press plano en Smith", muscle: "Pecho" },
+  { name: "Pull-over con mancuerna", muscle: "Pecho" },
+  { name: "Press banca", muscle: "Pecho" },
+  { name: "Dominadas", muscle: "Espalda" },
+  { name: "Encogimientos con mancuernas", muscle: "Espalda" },
+  { name: "Jalón al pecho", muscle: "Espalda" },
+  { name: "Jalón en máquina", muscle: "Espalda" },
+  { name: "Peso muerto", muscle: "Espalda" },
+  { name: "Remo con mancuernas", muscle: "Espalda" },
+  { name: "Remo con barra", muscle: "Espalda" },
+  { name: "Remo en máquina", muscle: "Espalda" },
+  { name: "Remo en T", muscle: "Espalda" },
+  { name: "Face pull", muscle: "Espalda", secondary: ["Hombro"] },
+  { name: "Extensión lumbar", muscle: "Espalda" },
+  { name: "Jalón con agarre cerrado supino", muscle: "Espalda" },
+  { name: "Elevaciones frontales con mancuernas", muscle: "Hombro" },
+  { name: "Pajaritos", muscle: "Hombro" },
+  { name: "Pec deck posterior invertido", muscle: "Hombro", secondary: ["Espalda"] },
+  { name: "Press militar con mancuernas", muscle: "Hombro" },
+  { name: "Aperturas de hombro en poleas", muscle: "Hombro" },
+  { name: "Aperturas de hombro", muscle: "Hombro" },
+  { name: "Press militar con barra", muscle: "Hombro" },
+  { name: "Remo vertical", muscle: "Hombro" },
+  { name: "Press militar en máquina", muscle: "Hombro" },
+  { name: "Apertura de hombro en máquina", muscle: "Hombro" },
+  { name: "Press Arnold", muscle: "Hombro" },
+  { name: "Curl con barra recta", muscle: "Bíceps" },
+  { name: "Curl con barra Z", muscle: "Bíceps" },
+  { name: "Curl en polea", muscle: "Bíceps" },
+  { name: "Curl concentrado", muscle: "Bíceps" },
+  { name: "Curl martillo", muscle: "Bíceps" },
+  { name: "Curl predicador con barra", muscle: "Bíceps" },
+  { name: "Curl predicador con mancuernas", muscle: "Bíceps" },
+  { name: "Curl predicador en máquina", muscle: "Bíceps" },
+  { name: "Curl con mancuernas alterno", muscle: "Bíceps" },
+];
+function findExerciseByName(name){ return EXERCISE_LIBRARY.find(e => e.name === name); }
+
+const MUSCLE_SYNONYMS = {
+  "Pecho": ["pecho", "pectoral", "pectorales", "pecs", "chest"],
+  "Espalda": ["espalda", "dorsal", "dorsales", "dorso", "back", "lat", "lats"],
+  "Hombro": ["hombro", "hombros", "deltoide", "deltoides", "delt", "delts", "shoulder"],
+  "Bíceps": ["biceps", "bíceps", "brazo", "brazos", "curl", "arm", "arms", "bicep"],
+};
+function normalizeText(s){
+  return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+const TIME_BRACKET_LABELS_STD = { "0-3":"0-3 meses", "3-6":"3-6 meses", "6-12":"6-12 meses", "1-2a":"1-2 años", "+2a":"+2 años" };
+const STRENGTH_STANDARDS = {
+  "Press banca":             { "0-3":0.50, "3-6":0.70, "6-12":0.90, "1-2a":1.15, "+2a":1.40 },
+  "Peso muerto":             { "0-3":0.75, "3-6":1.00, "6-12":1.35, "1-2a":1.75, "+2a":2.10 },
+  "Press militar con barra": { "0-3":0.35, "3-6":0.45, "6-12":0.55, "1-2a":0.70, "+2a":0.85 },
+  "Remo con barra":          { "0-3":0.45, "3-6":0.60, "6-12":0.75, "1-2a":0.95, "+2a":1.15 },
+};
+function computeExpectedMax(profile, exerciseName){
+  if(!profile || !profile.weightKg || !profile.timeTraining) return null;
+  const table = STRENGTH_STANDARDS[exerciseName];
+  if(!table) return null;
+  const mult = table[profile.timeTraining];
+  if(!mult) return null;
+  return Math.round(profile.weightKg * mult * 2) / 2;
+}
+
+function exerciseMaxWeight(sets){
+  return (sets || []).reduce((m, s) => (s.kg || 0) > m ? s.kg : m, 0);
+}
+
+// misma gráfica de evolución que en la app principal, con la línea de expectativa
+function buildLineChartSvg(values, expected){
+  if(!values || values.length < 2){
+    return `<div class="chart-empty">Necesitas al menos 2 sesiones registradas de este ejercicio para ver la gráfica.</div>`;
+  }
+  const W = 100, H = 34, padY = 4;
+  let max = Math.max(...values);
+  let min = Math.min(...values);
+  if(expected != null){ max = Math.max(max, expected); min = Math.min(min, expected); }
+  const range = (max - min) || 1;
+  const stepX = W / (values.length - 1);
+  const pts = values.map((v,i) => {
+    const x = i * stepX;
+    const y = H - padY - ((v - min) / range) * (H - padY * 2);
+    return [x, y];
+  });
+  const pathD = pts.map((p,i) => (i===0?"M":"L") + p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+  const areaD = pathD + ` L${pts[pts.length-1][0].toFixed(2)},${H} L0,${H} Z`;
+  const trendUp = values[values.length-1] >= values[0];
+  const lineColor = trendUp ? "#34c579" : "#ff5a2e";
+  const dotsLast = `<circle cx="${pts[pts.length-1][0].toFixed(2)}" cy="${pts[pts.length-1][1].toFixed(2)}" r="2.2" fill="${lineColor}"/>`;
+
+  let expectedLine = "";
+  if(expected != null){
+    const ey = H - padY - ((expected - min) / range) * (H - padY * 2);
+    expectedLine = `<line x1="0" y1="${ey.toFixed(2)}" x2="${W}" y2="${ey.toFixed(2)}" stroke="#d9a441" stroke-width="1" stroke-dasharray="3,2" vector-effect="non-scaling-stroke"/>`;
+  }
+
+  const svg = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="mini-chart">
+      <path d="${areaD}" fill="${lineColor}" opacity="0.12" stroke="none"/>
+      ${expectedLine}
+      <path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dotsLast}
+    </svg>`;
+
+  const caption = `
+    <div class="chart-caption">
+      <span>${min}kg</span>
+      <span class="${trendUp?'up':'down'}">${trendUp?'▲':'▼'} ${values[0]}kg → ${values[values.length-1]}kg</span>
+      <span>${max}kg</span>
+    </div>`;
+
+  let gapHtml = "";
+  if(expected != null){
+    const current = values[values.length-1];
+    const diff = current - expected;
+    const pct = (diff/expected)*100;
+    const cls = diff >= 0 ? "up" : "down";
+    const arrow = diff >= 0 ? "▲" : "▼";
+    gapHtml = `<div class="gap-badge ${cls}">${arrow} ${diff>=0?"+":""}${diff.toFixed(1)}kg vs. esperado (${expected}kg) · ${pct>=0?"+":""}${pct.toFixed(0)}%</div>`;
+  }
+
+  return svg + caption + gapHtml;
 }
 
 $("btnCreate").addEventListener("click", async () => {
@@ -328,32 +546,47 @@ function fmtDateFull(iso){
   return `${dd}-${mm}-${d.getFullYear()}`;
 }
 
-function buildLineChartSvg(values){
-  if(!values || values.length === 0){
-    return '<div style="color:var(--faint);font-size:12.5px;">Sin datos suficientes todavía.</div>';
-  }
-  const W = 560, H = 150, pad = 22;
-  const vals = values.length === 1 ? [values[0], values[0]] : values;
-  const max = Math.max(...vals, 1);
-  const min = Math.min(...vals, 0);
-  const range = (max - min) || 1;
-  const stepX = (W - pad * 2) / (vals.length - 1 || 1);
-  const pts = vals.map((v, i) => {
-    const x = pad + i * stepX;
-    const y = H - pad - ((v - min) / range) * (H - pad * 2);
-    return [x, y];
-  });
-  const pathD = pts.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
-  const areaD = pathD + ` L${pts[pts.length-1][0].toFixed(1)},${H-pad} L${pts[0][0].toFixed(1)},${H-pad} Z`;
-  const dots = pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="#ff5a2e"/>`).join("");
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;overflow:visible;display:block;">
-    <path d="${areaD}" fill="rgba(255,90,46,0.13)" stroke="none"/>
-    <path d="${pathD}" fill="none" stroke="#ff5a2e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    ${dots}
-  </svg>`;
-}
+function buildLineChartSvgOLD_UNUSED_placeholder(){ /* eliminado: se sustituyó por la version con brecha de expectativa mas arriba */ }
 
 const TIME_BRACKET_LABELS = { "0-3":"0-3 meses", "3-6":"3-6 meses", "6-12":"6-12 meses", "1-2a":"1-2 años", "+2a":"+2 años" };
+
+let adminProgressSearchQuery = "";
+
+function getExerciseDayNames(sessions, exerciseName){
+  const days = new Set();
+  sessions.forEach(sess => {
+    if(sess.exercises.some(e => e.name === exerciseName)) days.add(sess.dayName);
+  });
+  return Array.from(days);
+}
+
+function buildExerciseTimeSeriesAdmin(sessions, exerciseName){
+  const points = [];
+  sessions.forEach(sess => {
+    const ex = sess.exercises.find(e => e.name === exerciseName);
+    if(ex){
+      const mx = exerciseMaxWeight(ex.sets);
+      if(mx > 0) points.push(mx);
+    }
+  });
+  return points;
+}
+
+function statMatchesQueryAdmin(name, dayNames, q){
+  if(!q) return true;
+  const nq = normalizeText(q);
+  if(normalizeText(name).includes(nq)) return true;
+  if(dayNames.some(d => normalizeText(d).includes(nq))) return true;
+  const libEx = findExerciseByName(name);
+  if(libEx){
+    const allMuscles = [libEx.muscle, ...(libEx.secondary||[])];
+    if(allMuscles.some(m => {
+      const syns = MUSCLE_SYNONYMS[m] || [];
+      return syns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s)));
+    })) return true;
+  }
+  return false;
+}
 
 function renderUserProgress(username, data){
   const container = $("userProgressResult");
@@ -380,14 +613,31 @@ function renderUserProgress(username, data){
     return;
   }
 
-  const volumes = sessions.map(s => s.exercises.reduce((sum, ex) => sum + exerciseVolume(ex.sets), 0));
+  const exerciseNames = [...new Set(sessions.flatMap(s => s.exercises.map(e => e.name)))];
+  const allStats = exerciseNames.map(name => {
+    const dayNames = getExerciseDayNames(sessions, name);
+    const series = buildExerciseTimeSeriesAdmin(sessions, name);
+    const expected = computeExpectedMax(data.profile, name);
+    return { name, dayNames, series, expected };
+  });
+  const filtered = allStats.filter(st => statMatchesQueryAdmin(st.name, st.dayNames, adminProgressSearchQuery));
 
-  let html = profileHtml + `<div style="margin-top:18px;">
-    <div style="font-size:11px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Volumen total por sesión (kg × reps) — evolución completa</div>
-    ${buildLineChartSvg(volumes)}
-  </div>`;
+  let html = profileHtml;
+  html += `<input type="text" class="prog-search" id="adminProgSearch" placeholder="Buscar por ejercicio, día ('Torso A') o grupo ('pecho')…" value="${String(adminProgressSearchQuery).replace(/"/g,"&quot;")}">`;
 
-  html += `<div style="margin-top:22px;font-size:11px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Historial (${sessions.length} sesión${sessions.length===1?'':'es'})</div>`;
+  if(filtered.length === 0){
+    html += `<div style="color:var(--faint);font-size:12.5px;padding:8px 0 4px;">Ningún ejercicio ni día coincide con la búsqueda.</div>`;
+  } else {
+    filtered.forEach(st => {
+      html += `<div class="stat-card">
+        <h3>${st.name}</h3>
+        ${st.dayNames.length ? `<div class="stat-day-tags">${st.dayNames.map(d=>`<span class="stat-day-tag">${d}</span>`).join("")}</div>` : ``}
+        ${buildLineChartSvg(st.series, st.expected)}
+      </div>`;
+    });
+  }
+
+  html += `<div style="margin-top:20px;font-size:11px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Historial (${sessions.length} sesión${sessions.length===1?'':'es'})</div>`;
 
   [...sessions].reverse().forEach(sess => {
     const isOpen = adminExpandedIds.has(sess.id);
@@ -415,6 +665,17 @@ function renderUserProgress(username, data){
   });
 
   container.innerHTML = html;
+
+  const searchInput = document.getElementById("adminProgSearch");
+  if(searchInput){
+    searchInput.addEventListener("input", (e) => {
+      adminProgressSearchQuery = e.target.value;
+      renderUserProgress(username, data);
+      const el = document.getElementById("adminProgSearch");
+      if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    });
+  }
+
   container.querySelectorAll("[data-toggle]").forEach(el => {
     el.addEventListener("click", () => {
       const id = Number(el.dataset.toggle);
@@ -439,6 +700,7 @@ $("btnViewProgress").addEventListener("click", async () => {
   try{
     const data = await apiCall("/admin/user-data", { method:"POST", body: JSON.stringify({ username }) });
     adminExpandedIds = new Set();
+    adminProgressSearchQuery = "";
     renderUserProgress(username, data);
   }catch(e){
     showMsg(msg, "Error: " + e.message, false);
