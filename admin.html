@@ -330,18 +330,36 @@ function buildLineChartSvg(values){
   </svg>`;
 }
 
+const TIME_BRACKET_LABELS = { "0-3":"0-3 meses", "3-6":"3-6 meses", "6-12":"6-12 meses", "1-2a":"1-2 años", "+2a":"+2 años" };
+
 function renderUserProgress(username, data){
   const container = $("userProgressResult");
   const sessions = (data.state && data.state.sessions) || [];
 
+  let profileHtml = "";
+  if(data.profile){
+    const p = data.profile;
+    const fecha = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString("es-ES") : "";
+    profileHtml = `<div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:16px;">
+      <div style="font-size:11px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Datos aportados por el usuario ${fecha ? `(${fecha})` : ""}</div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13.5px;">
+        <div><b>${p.weightKg}</b> kg</div>
+        <div><b>${p.heightCm}</b> cm</div>
+        <div><b>${TIME_BRACKET_LABELS[p.timeTraining] || p.timeTraining}</b> entrenando</div>
+      </div>
+    </div>`;
+  } else {
+    profileHtml = `<div style="color:var(--faint);font-size:12.5px;margin-top:16px;font-style:italic;">Este usuario todavía no ha completado el formulario de peso/altura/tiempo entrenando.</div>`;
+  }
+
   if(sessions.length === 0){
-    container.innerHTML = '<div style="color:var(--faint);font-size:13px;margin-top:14px;">Este usuario todavía no tiene sesiones guardadas.</div>';
+    container.innerHTML = profileHtml + '<div style="color:var(--faint);font-size:13px;margin-top:14px;">Este usuario todavía no tiene sesiones guardadas.</div>';
     return;
   }
 
   const volumes = sessions.map(s => s.exercises.reduce((sum, ex) => sum + exerciseVolume(ex.sets), 0));
 
-  let html = `<div style="margin-top:18px;">
+  let html = profileHtml + `<div style="margin-top:18px;">
     <div style="font-size:11px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Volumen total por sesión (kg × reps) — evolución completa</div>
     ${buildLineChartSvg(volumes)}
   </div>`;
