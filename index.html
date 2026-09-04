@@ -272,8 +272,14 @@
   }
   .account-pill span.uname{ font-size:12px; font-weight:700; color:var(--text-dim); max-width:90px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .modal-overlay{ position:fixed; inset:0; background: rgba(0,0,0,0.6); z-index:50; display:flex; align-items:flex-end; justify-content:center; }
-  .modal-sheet{ width:100%; max-width:460px; background: var(--card); border-radius: 18px 18px 0 0; padding: 22px 20px calc(24px + var(--safe-bottom)); border-top:1px solid var(--line-soft); }
+  .modal-overlay{ position:fixed; inset:0; background: rgba(0,0,0,0.6); z-index:50; display:flex; align-items:flex-end; justify-content:center; animation: modalBackdropIn 0.22s ease; }
+  .modal-overlay.closing{ animation: modalBackdropOut 0.18s ease forwards; }
+  .modal-sheet{ width:100%; max-width:460px; background: var(--card); border-radius: 18px 18px 0 0; padding: 22px 20px calc(24px + var(--safe-bottom)); border-top:1px solid var(--line-soft); animation: modalSheetIn 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
+  .modal-overlay.closing .modal-sheet{ animation: modalSheetOut 0.18s ease forwards; }
+  @keyframes modalBackdropIn{ from{ opacity:0; } to{ opacity:1; } }
+  @keyframes modalBackdropOut{ from{ opacity:1; } to{ opacity:0; } }
+  @keyframes modalSheetIn{ from{ transform:translateY(28px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+  @keyframes modalSheetOut{ from{ transform:translateY(0); opacity:1; } to{ transform:translateY(28px); opacity:0; } }
   .legal-sheet{ max-height:88vh; display:flex; flex-direction:column; }
   .legal-scroll{ overflow-y:auto; flex:1; margin: 10px 0 16px; padding-right:2px; }
   .legal-section{ border-bottom:1px solid var(--line-soft); }
@@ -818,6 +824,13 @@ async function onAuthSubmit(e){
   }
 }
 
+// Cierra cualquier modal con una animación suave de salida, en vez de desaparecer de golpe
+function closeModal(overlay){
+  if(!overlay) return;
+  overlay.classList.add("closing");
+  setTimeout(()=> overlay.remove(), 180);
+}
+
 function showAccountModal(){
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
@@ -845,14 +858,14 @@ function showAccountModal(){
     </div>
   `;
   document.body.appendChild(overlay);
-  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) overlay.remove(); });
-  document.getElementById("closeModalBtn").addEventListener("click", ()=> overlay.remove());
+  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeModal(overlay); });
+  document.getElementById("closeModalBtn").addEventListener("click", ()=> closeModal(overlay));
   document.getElementById("legalBtn").addEventListener("click", ()=>{
-    overlay.remove();
+    closeModal(overlay);
     showLegalModal();
   });
   document.getElementById("logoutBtn").addEventListener("click", async ()=>{
-    overlay.remove();
+    closeModal(overlay);
     await apiLogout();
     clearLocalSession();
     currentUser = null; authToken = null; state = null; plans = []; activePlanId = null; userProfile = null; weightReminderDismissed = false;
@@ -860,12 +873,12 @@ function showAccountModal(){
     renderApp();
   });
   document.getElementById("changePassBtn").addEventListener("click", ()=>{
-    overlay.remove();
+    closeModal(overlay);
     showChangePasswordModal();
   });
   if(!locked){
     document.getElementById("updateWeightBtn").addEventListener("click", ()=>{
-      overlay.remove();
+      closeModal(overlay);
       showUpdateWeightModal();
     });
   }
@@ -890,8 +903,8 @@ function showUpdateWeightModal(){
     </div>
   `;
   document.body.appendChild(overlay);
-  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) overlay.remove(); });
-  document.getElementById("weightCancelBtn").addEventListener("click", ()=> overlay.remove());
+  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeModal(overlay); });
+  document.getElementById("weightCancelBtn").addEventListener("click", ()=> closeModal(overlay));
   document.getElementById("weightForm").addEventListener("submit", async (e)=>{
     e.preventDefault();
     const errEl = document.getElementById("weightError");
@@ -908,7 +921,7 @@ function showUpdateWeightModal(){
       userProfile.weightKg = weight;
       userProfile.weightUpdatedAt = new Date().toISOString();
       await apiSaveData();
-      overlay.remove();
+      closeModal(overlay);
       render();
     }catch(err){
       errEl.textContent = "No se pudo guardar: " + err.message;
@@ -984,8 +997,8 @@ function showLegalModal(){
     </div>
   `;
   document.body.appendChild(overlay);
-  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) overlay.remove(); });
-  document.getElementById("closeLegalBtn").addEventListener("click", ()=> overlay.remove());
+  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeModal(overlay); });
+  document.getElementById("closeLegalBtn").addEventListener("click", ()=> closeModal(overlay));
 }
 
 function showChangePasswordModal(){
@@ -1015,8 +1028,8 @@ function showChangePasswordModal(){
     </div>
   `;
   document.body.appendChild(overlay);
-  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) overlay.remove(); });
-  document.getElementById("pwCancel").addEventListener("click", ()=> overlay.remove());
+  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeModal(overlay); });
+  document.getElementById("pwCancel").addEventListener("click", ()=> closeModal(overlay));
   document.getElementById("pwForm").addEventListener("submit", async (e)=>{
     e.preventDefault();
     const errEl = document.getElementById("pwError");
@@ -1034,7 +1047,7 @@ function showChangePasswordModal(){
     btn.disabled = true; btn.textContent = "Guardando…";
     try{
       await apiChangePassword(oldPassword, newPassword);
-      overlay.remove();
+      closeModal(overlay);
       alert("Contraseña actualizada correctamente.");
     }catch(err){
       errEl.textContent = err.message || "No se pudo cambiar la contraseña.";
@@ -1896,7 +1909,7 @@ function openExercisePicker(dayIdx, exIdx){
 
 function closeExercisePicker(){
   const overlay = document.getElementById("exercisePickerOverlay");
-  if(overlay) overlay.remove();
+  if(overlay) closeModal(overlay);
   pickerTarget = null;
 }
 
