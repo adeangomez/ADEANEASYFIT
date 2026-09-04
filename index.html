@@ -59,8 +59,12 @@
     border-bottom: 1px solid var(--line-soft);
     position: fixed; top: var(--safe-top); left:0; right:0; z-index: 20;
     box-shadow: 0 6px 18px -8px rgba(0,0,0,0.45);
-    -webkit-transform: translateZ(0); transform: translateZ(0); will-change: transform;
-    backface-visibility: hidden;
+    -webkit-transform: translateY(0); transform: translateY(0);
+    transition: transform 0.25s ease;
+    will-change: transform;
+  }
+  header.top.header-hidden{
+    -webkit-transform: translateY(-110%); transform: translateY(-110%);
   }
   .brand{ display:flex; align-items:center; justify-content:flex-start; gap:0; }
   .brand h1{ font-size: 24px; margin:0; color:var(--text); line-height:1; text-transform:uppercase; }
@@ -755,6 +759,9 @@ function renderApp(){
 // La cabecera es position:fixed (más fiable que sticky en iOS). Esta función
 // mantiene el contenido de #main siempre por debajo de ella, midiendo su
 // altura real en cada cambio, para que nada quede tapado ni se vea "cortado".
+// Además, la esconde en cuanto empiezas a bajar y solo vuelve a aparecer
+// cuando llegas de nuevo arriba del todo — para que no se quede flotando
+// encima del contenido mientras navegas.
 function setupFixedHeaderSpacing(){
   const header = document.querySelector("header.top");
   const main = document.getElementById("main");
@@ -766,6 +773,19 @@ function setupFixedHeaderSpacing(){
   } else {
     window.addEventListener("resize", apply);
   }
+
+  const TOP_THRESHOLD = 8; // px — margen para considerar que "estás arriba del todo"
+  const updateVisibility = () => {
+    const h = document.querySelector("header.top");
+    if(!h) return;
+    if(window.scrollY <= TOP_THRESHOLD){
+      h.classList.remove("header-hidden");
+    } else {
+      h.classList.add("header-hidden");
+    }
+  };
+  updateVisibility();
+  window.addEventListener("scroll", updateVisibility, { passive: true });
 }
 
 function authScreenHtml(){
