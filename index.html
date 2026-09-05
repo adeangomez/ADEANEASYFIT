@@ -461,6 +461,14 @@ let progressSearchQuery = "";
 let userProfile = null; // { weightKg, heightCm, timeTraining, updatedAt }
 let weightReminderDismissed = false;
 
+// Lleva la cuenta del "_rev" (nº de versión) de los datos que sabemos que
+// hay en el servidor. El servidor sube este número en cada guardado y lo
+// comprueba en cada PUT /data — así, si esta pestaña guarda con un "_rev"
+// desfasado (por ejemplo, restaurada del bfcache con el día antiguo en
+// memoria mientras otro dispositivo ya guardó algo más nuevo), el servidor
+// RECHAZA el guardado en vez de sobrescribir. Ver apiSaveData() más abajo.
+let localDataRev = 0;
+
 const TIME_BRACKETS = [
   { id: "0-3",  label: "0-3 meses" },
   { id: "3-6",  label: "3-6 meses" },
@@ -557,6 +565,7 @@ async function apiFetch(path, options = {}){
   if(!res.ok){
     const e = new Error(data.error || ("Error del servidor (" + res.status + ")"));
     e.status = res.status;
+    e.data = data;
     throw e;
   }
   return data;
@@ -578,13 +587,37 @@ async function apiLogout(){
   try{ await apiFetch("/logout", { method: "POST" }); }catch(e){}
 }
 async function apiGetData(){
-  return apiFetch("/data", { method: "GET" });
+  const data = await apiFetch("/data", { method: "GET" });
+  if(data && typeof data._rev === "number") localDataRev = data._rev;
+  return data;
 }
 async function apiSaveData(){
-  return apiFetch("/data", {
-    method: "PUT",
-    body: JSON.stringify({ plans, activePlanId, state, profile: userProfile })
-  });
+  try{
+    const result = await apiFetch("/data", {
+      method: "PUT",
+      body: JSON.stringify({ plans, activePlanId, state, profile: userProfile, _rev: localDataRev })
+    });
+    if(typeof result._rev === "number") localDataRev = result._rev;
+    return result;
+  }catch(e){
+    if(e.status === 409 && e.data){
+      // El servidor ha rechazado el guardado porque hay datos más nuevos
+      // (guardados desde otra pestaña o dispositivo) de los que esta
+      // pestaña sabía. Nos ponemos al día con esos datos y avisamos, en
+      // vez de arriesgarnos a perder progreso guardado en otro sitio.
+      const fresh = e.data;
+      plans = Array.isArray(fresh.plans) ? fresh.plans : plans;
+      activePlanId = (fresh.activePlanId && plans.some(p=>p.id===fresh.activePlanId)) ? fresh.activePlanId : activePlanId;
+      state = (fresh.state && typeof fresh.state === "object") ? fresh.state : state;
+      userProfile = fresh.profile || userProfile;
+      if(typeof fresh._rev === "number") localDataRev = fresh._rev;
+      try{ if(currentUser && document.getElementById("main")) render(); }catch(err){}
+      const conflictErr = new Error("Se han detectado cambios más recientes guardados desde otra pestaña o dispositivo. Se han recargado los datos actuales para no perder información — revisa la pantalla y repite la acción si todavía hace falta.");
+      conflictErr.isStaleConflict = true;
+      throw conflictErr;
+    }
+    throw e;
+  }
 }
 
 // Guarda en el servidor; si falla, avisa con el motivo real (no un mensaje generico)
@@ -2151,6 +2184,40 @@ function renderCardio(){
     <div><b>Zona Cardio</b><br>Próximamente podrás registrar aquí tus ejercicios cardiovasculares (running, pádel, bici…) desde una librería cerrada, igual que ya haces con el gimnasio.</div>
   </div>`;
 }
+
+// -------------------- RECUPERACIÓN AL VOLVER A LA PESTAÑA --------------------
+// En móvil (sobre todo con la app "añadida a inicio" en iOS/Android) es muy
+// común que el navegador restaure la pestaña desde el bfcache al volver a
+// primer plano SIN recargarla ni pedir nada por red: el JS sigue vivo con el
+// día que tenía en memoria desde que se dejó en segundo plano, que puede
+// llevar horas o días desfasado. Al detectar una restauración así (o un
+// regreso tras estar oculta mucho tiempo) refrescamos los datos reales del
+// servidor antes de que el usuario pueda volver a guardar con datos viejos.
+let lastHiddenAt = 0;
+async function refreshFromServerOnResume(){
+  if(!currentUser || !authToken) return;
+  if(isSavingSession) return;
+  try{
+    const fresh = await apiGetData();
+    if(fresh){
+      plans = Array.isArray(fresh.plans) ? fresh.plans : plans;
+      activePlanId = (fresh.activePlanId && plans.some(p=>p.id===fresh.activePlanId)) ? fresh.activePlanId : activePlanId;
+      state = (fresh.state && typeof fresh.state === "object") ? fresh.state : state;
+      userProfile = fresh.profile || userProfile;
+      if(document.getElementById("main")) render();
+    }
+  }catch(e){
+    console.warn("No se pudo refrescar datos al volver a la pestaña", e.message);
+  }
+}
+window.addEventListener("pageshow", (e)=>{ if(e.persisted) refreshFromServerOnResume(); });
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "visible"){
+    if(lastHiddenAt && (Date.now() - lastHiddenAt) > 60000) refreshFromServerOnResume();
+  } else {
+    lastHiddenAt = Date.now();
+  }
+});
 
 // -------------------- INIT --------------------
 (async function init(){
