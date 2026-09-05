@@ -336,12 +336,12 @@ const DEFAULT_DAYS_SEED = [
     { name: "Crunch abdominal", sets: 4 },
   ]},
   { name: "Brazos", sub: "Bíceps · Tríceps · Hombro", exercises: [
-    { name: "Curl bíceps barra Z", sets: 4 },
-    { name: "Curl tríceps unilateral (muñequera)", sets: 2 },
-    { name: "Curl tríceps barra V", sets: 2 },
-    { name: "Curl Bayesian", sets: 3 },
-    { name: "Fondos en máquina o libres", sets: 3 },
-    { name: "Curl predicador", sets: 3 },
+    { name: "Curl con barra Z", sets: 4 },
+    { name: "Press de tríceps unilateral en polea", sets: 2 },
+    { name: "Extensión de tríceps en polea alta", sets: 2 },
+    { name: "Curl bayesiano en polea", sets: 3 },
+    { name: "Fondos en máquina de tríceps", sets: 3 },
+    { name: "Curl predicador en máquina", sets: 3 },
     { name: "Press francés en polea", sets: 2 },
     { name: "Aperturas de hombro", sets: 3 },
   ]},
@@ -357,8 +357,8 @@ const DEFAULT_DAYS_SEED = [
     { name: "Dominadas", sets: 3 },
     { name: "Press inclinado en Smith", sets: 2 },
     { name: "Aperturas de pecho en máquina", sets: 2 },
-    { name: "Curl bíceps barra Z", sets: 2 },
-    { name: "Curl tríceps unilateral (muñequera)", sets: 2 },
+    { name: "Curl con barra Z", sets: 2 },
+    { name: "Press de tríceps unilateral en polea", sets: 2 },
     { name: "Remo pronado (dorsal)", sets: 2 },
     { name: "Crunch abdominal", sets: 3 },
     { name: "Aperturas de hombro", sets: 3 },
@@ -688,6 +688,25 @@ function migratedExerciseName(name){
   }
   if(n.includes("bayesian") || n.includes("bayesiano")){
     if(name !== "Curl bayesiano en polea") return "Curl bayesiano en polea";
+  }
+  // Ejercicios de la rutina por defecto que no coincidían con la biblioteca
+  // cerrada (se detectó porque las rutinas de usuarios antiguos los tenían
+  // con nombres distintos a los oficiales). Coincidencia flexible para no
+  // depender de tildes/mayúsculas exactas.
+  if(n.includes("curl") && n.includes("biceps") && n.includes("barra") && n.includes("z")){
+    if(name !== "Curl con barra Z") return "Curl con barra Z";
+  }
+  if(n.includes("triceps") && n.includes("unilateral")){
+    if(name !== "Press de tríceps unilateral en polea") return "Press de tríceps unilateral en polea";
+  }
+  if(n.includes("curl") && n.includes("triceps") && n.includes("barra") && n.includes("v")){
+    if(name !== "Extensión de tríceps en polea alta") return "Extensión de tríceps en polea alta";
+  }
+  if(n.includes("fondos") && n.includes("maquina") && n.includes("libres")){
+    if(name !== "Fondos en máquina de tríceps") return "Fondos en máquina de tríceps";
+  }
+  if(n === normalizeForMigration("Curl predicador")){
+    if(name !== "Curl predicador en máquina") return "Curl predicador en máquina";
   }
   return name;
 }
