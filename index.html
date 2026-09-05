@@ -427,6 +427,7 @@ const EXERCISE_LIBRARY = [
   { id: "curl-predicador-mancuernas",  name: "Curl predicador con mancuernas", muscle: "Bíceps" },
   { id: "curl-predicador-maquina",     name: "Curl predicador en máquina",   muscle: "Bíceps" },
   { id: "curl-mancuernas-alterno",     name: "Curl con mancuernas alterno",  muscle: "Bíceps" },
+  { id: "curl-bayesiano-polea",        name: "Curl bayesiano en polea",      muscle: "Bíceps" },
   { id: "patada-triceps-polea",        name: "Patada de tríceps en polea",   muscle: "Tríceps" },
   { id: "extension-triceps-trasnuca",  name: "Extensión de tríceps trasnuca", muscle: "Tríceps" },
   { id: "patada-triceps-mancuerna",    name: "Patada de tríceps con mancuerna", muscle: "Tríceps" },
@@ -684,6 +685,9 @@ function migratedExerciseName(name){
   }
   if(n.includes("remo") && n.includes(" t") || n.includes("remo t") || n.includes("remo en barra t")){
     if(name !== "Remo en T") return "Remo en T";
+  }
+  if(n.includes("bayesian") || n.includes("bayesiano")){
+    if(name !== "Curl bayesiano en polea") return "Curl bayesiano en polea";
   }
   return name;
 }
