@@ -359,7 +359,7 @@ const DEFAULT_DAYS_SEED = [
     { name: "Aperturas de pecho en máquina", sets: 2 },
     { name: "Curl con barra Z", sets: 2 },
     { name: "Press de tríceps unilateral en polea", sets: 2 },
-    { name: "Remo pronado (dorsal)", sets: 2 },
+    { name: "Jalón con agarre cerrado supino", sets: 2 },
     { name: "Crunch abdominal", sets: 3 },
     { name: "Aperturas de hombro", sets: 3 },
   ]},
@@ -707,6 +707,9 @@ function migratedExerciseName(name){
   }
   if(n === normalizeForMigration("Curl predicador")){
     if(name !== "Curl predicador en máquina") return "Curl predicador en máquina";
+  }
+  if(n.includes("remo") && n.includes("pronado")){
+    if(name !== "Jalón con agarre cerrado supino") return "Jalón con agarre cerrado supino";
   }
   return name;
 }
