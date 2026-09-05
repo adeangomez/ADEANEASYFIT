@@ -639,8 +639,15 @@ function renderUserProgress(username, data){
   if(data.profile){
     const p = data.profile;
     const fecha = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString("es-ES") : "";
+    const avatarThumbHtml = p.avatarBase64
+      ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+           <div style="width:44px;height:44px;border-radius:50%;background-image:url('${p.avatarBase64}');background-size:cover;background-position:center;flex-shrink:0;border:1px solid var(--line);"></div>
+           <button class="danger" id="btnRemoveAvatar" style="width:auto;">Quitar foto (moderación)</button>
+         </div>`
+      : "";
     profileHtml = `<div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:16px;">
       <div style="font-size:11px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Datos aportados por el usuario ${fecha ? `(${fecha})` : ""}</div>
+      ${avatarThumbHtml}
       <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13.5px;">
         <div><b>${p.weightKg}</b> kg</div>
         <div><b>${p.heightCm}</b> cm</div>
@@ -771,6 +778,23 @@ function bindWeightRangeButtons(username, data){
       renderUserProgress(username, data);
     });
   });
+  const removeAvatarBtn = document.getElementById("btnRemoveAvatar");
+  if(removeAvatarBtn){
+    removeAvatarBtn.addEventListener("click", async () => {
+      if(!confirm(`¿Quitar la foto de perfil de "${username}"? No podrá deshacerse desde aquí; el usuario podrá subir otra cuando quiera.`)) return;
+      removeAvatarBtn.disabled = true;
+      removeAvatarBtn.textContent = "Quitando…";
+      try{
+        await apiCall("/admin/remove-avatar", { method: "POST", body: JSON.stringify({ username }) });
+        if(data.profile) data.profile.avatarBase64 = null;
+        renderUserProgress(username, data);
+      }catch(e){
+        alert("No se pudo quitar la foto: " + e.message);
+        removeAvatarBtn.disabled = false;
+        removeAvatarBtn.textContent = "Quitar foto (moderación)";
+      }
+    });
+  }
 }
 
 // -------------------- Día actual del circuito (pestaña independiente) --------------------
