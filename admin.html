@@ -339,6 +339,15 @@ const EXERCISE_LIBRARY = [
   { name: "Press francés en polea", muscle: "Tríceps" },
   { name: "Extensión de tríceps en polea alta", muscle: "Tríceps" },
   { name: "Press de tríceps unilateral en polea", muscle: "Tríceps" },
+  { name: "Abdominales con levantamiento de piernas en 90°", muscle: "Abdomen" },
+  { name: "Crunch de abdomen en polea", muscle: "Abdomen" },
+  { name: "Crunch de abdomen", muscle: "Abdomen" },
+  { name: "Dragon flags de abdomen", muscle: "Abdomen" },
+  { name: "Planchas abdominales", muscle: "Abdomen" },
+  { name: "Rodillas al pecho", muscle: "Abdomen" },
+  { name: "Rotación de oblicuos en poleas", muscle: "Abdomen" },
+  { name: "Rueda abdominal", muscle: "Abdomen" },
+  { name: "Crunch de abdomen en máquina", muscle: "Abdomen" },
 ];
 function findExerciseByName(name){ return EXERCISE_LIBRARY.find(e => e.name === name); }
 
@@ -348,6 +357,7 @@ const MUSCLE_SYNONYMS = {
   "Hombro": ["hombro", "hombros", "deltoide", "deltoides", "delt", "delts", "shoulder"],
   "Bíceps": ["biceps", "bíceps", "brazo", "brazos", "curl", "arm", "arms", "bicep"],
   "Tríceps": ["triceps", "tríceps", "tricep"],
+  "Abdomen": ["abdomen", "abdominales", "abs", "core", "oblicuos", "oblicuo", "sixpack", "six pack"],
 };
 function normalizeText(s){
   return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
