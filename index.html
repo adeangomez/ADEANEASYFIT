@@ -441,6 +441,15 @@ const EXERCISE_LIBRARY = [
   { id: "press-frances-polea",         name: "Press francés en polea",       muscle: "Tríceps" },
   { id: "extension-triceps-polea-alta", name: "Extensión de tríceps en polea alta", muscle: "Tríceps" },
   { id: "press-triceps-unilateral-polea", name: "Press de tríceps unilateral en polea", muscle: "Tríceps" },
+  { id: "elevacion-piernas-90",        name: "Abdominales con levantamiento de piernas en 90°", muscle: "Abdomen" },
+  { id: "crunch-abdomen-polea",        name: "Crunch de abdomen en polea",   muscle: "Abdomen" },
+  { id: "crunch-abdomen",              name: "Crunch de abdomen",            muscle: "Abdomen" },
+  { id: "dragon-flag-abdomen",         name: "Dragon flags de abdomen",      muscle: "Abdomen" },
+  { id: "plancha-abdominal",           name: "Planchas abdominales",         muscle: "Abdomen" },
+  { id: "rodillas-pecho",              name: "Rodillas al pecho",            muscle: "Abdomen" },
+  { id: "rotacion-oblicuos-poleas",    name: "Rotación de oblicuos en poleas", muscle: "Abdomen" },
+  { id: "rueda-abdominal",             name: "Rueda abdominal",              muscle: "Abdomen" },
+  { id: "crunch-abdomen-maquina",      name: "Crunch de abdomen en máquina", muscle: "Abdomen" },
 ];
 function exerciseImgUrl(id){ return ASSETS_BASE + id + ".png"; }
 function findExerciseByName(name){ return EXERCISE_LIBRARY.find(e => e.name === name); }
@@ -2280,6 +2289,7 @@ const MUSCLE_SYNONYMS = {
   "Hombro": ["hombro", "hombros", "deltoide", "deltoides", "delt", "delts", "shoulder"],
   "Bíceps": ["biceps", "bíceps", "brazo", "brazos", "curl", "arm", "arms", "bicep"],
   "Tríceps": ["triceps", "tríceps", "tricep"],
+  "Abdomen": ["abdomen", "abdominales", "abs", "core", "oblicuos", "oblicuo", "sixpack", "six pack"],
 };
 function normalizeText(s){
   return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
