@@ -458,6 +458,8 @@ let activePlanId = null;
 let activeTab = "train";
 let progressWindow = "week";
 let progressSearchQuery = "";
+let progressView = "carga";       // "carga" (progreso de peso levantado) | "peso" (peso corporal)
+let weightChartRange = "absolute"; // "month" | "quarter" | "semester" | "year" | "absolute"
 let userProfile = null; // { weightKg, heightCm, timeTraining, updatedAt }
 let weightReminderDismissed = false;
 
@@ -781,7 +783,8 @@ async function onOnboardSubmit(e){
   const btn = document.getElementById("onboardSubmit");
   btn.disabled = true; btn.textContent = "Guardando…";
 
-  userProfile = { weightKg: weight, heightCm: height, timeTraining: time, weightUpdatedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  userProfile = { weightKg: weight, heightCm: height, timeTraining: time, weightUpdatedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), weightHistory: [] };
+  userProfile.weightHistory.push({ date: userProfile.weightUpdatedAt, weightKg: weight });
   try{
     await apiSaveData();
     renderApp();
@@ -1020,6 +1023,8 @@ function showUpdateWeightModal(){
     try{
       userProfile.weightKg = weight;
       userProfile.weightUpdatedAt = new Date().toISOString();
+      if(!Array.isArray(userProfile.weightHistory)) userProfile.weightHistory = [];
+      userProfile.weightHistory.push({ date: userProfile.weightUpdatedAt, weightKg: weight });
       await apiSaveData();
       closeModal(overlay);
       render();
@@ -1376,9 +1381,9 @@ function buildExerciseTimeSeries(exerciseName){
 }
 
 // Gráfica de línea en SVG, sin librerías externas. values: array de números.
-function buildLineChartSvg(values, expected){
+function buildLineChartSvg(values, expected, emptyMessage){
   if(!values || values.length < 2){
-    return `<div class="chart-empty">Necesitas al menos 2 sesiones registradas de este ejercicio para ver la gráfica.</div>`;
+    return `<div class="chart-empty">${emptyMessage || "Necesitas al menos 2 sesiones registradas de este ejercicio para ver la gráfica."}</div>`;
   }
   const W = 100, H = 34, padY = 4;
   let max = Math.max(...values);
@@ -1493,8 +1498,27 @@ function statMatchesQuery(st, q){
 }
 
 function renderProgress(){
+  if(progressView === "peso") renderWeightProgress();
+  else renderStrengthProgress();
+}
+
+function progressViewTabsHtml(){
+  return `<div class="filter-row" style="margin-bottom:10px;">
+    <button data-pv="carga" class="${progressView==='carga'?'active':''}">Progreso de carga</button>
+    <button data-pv="peso" class="${progressView==='peso'?'active':''}">Peso corporal</button>
+  </div>`;
+}
+function wireProgressViewTabs(){
+  document.querySelectorAll("[data-pv]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ progressView = btn.dataset.pv; renderProgress(); });
+  });
+}
+
+// -------------------- Sub-vista: progreso de carga (peso levantado por ejercicio) --------------------
+function renderStrengthProgress(){
   const main = document.getElementById("main");
-  let html = `
+  let html = progressViewTabsHtml();
+  html += `
     <div class="section-title"><h2>Progreso</h2></div>
     <div class="filter-row">
       <button data-w="week" class="${progressWindow==='week'?'active':''}">Semanal</button>
@@ -1510,6 +1534,7 @@ function renderProgress(){
     html += `<div class="empty"><div class="empty-icon">${ICON_PROGRESS}</div>
       <div>Todavía no hay sesiones guardadas.<br>Completa tu primer entrenamiento en la pestaña <b>Entrenar</b> para empezar a ver tu evolución.</div></div>`;
     main.innerHTML = html;
+    wireProgressViewTabs();
     wireAiAnalyzeButton();
     wireProgressSearch();
     return;
@@ -1520,6 +1545,7 @@ function renderProgress(){
   if(allStats.length === 0){
     html += `<div class="empty"><div>Aún no hay datos suficientes para este periodo.</div></div>`;
     main.innerHTML = html;
+    wireProgressViewTabs();
     wireAiAnalyzeButton();
     wireProgressSearch();
     return;
@@ -1527,6 +1553,7 @@ function renderProgress(){
   if(stats.length === 0){
     html += `<div class="empty"><div>Ningún ejercicio ni día coincide con "${escapeAttr(progressSearchQuery)}".</div></div>`;
     main.innerHTML = html;
+    wireProgressViewTabs();
     wireAiAnalyzeButton();
     wireProgressSearch();
     return;
@@ -1558,10 +1585,76 @@ function renderProgress(){
     </div>`;
   });
   main.innerHTML = html;
+  wireProgressViewTabs();
   wireAiAnalyzeButton();
   wireProgressSearch();
-  main.querySelectorAll(".filter-row button").forEach(btn=>{
+  main.querySelectorAll(".filter-row button[data-w]").forEach(btn=>{
     btn.addEventListener("click", ()=>{ progressWindow = btn.dataset.w; renderProgress(); });
+  });
+}
+
+// -------------------- Sub-vista: peso corporal --------------------
+const WEIGHT_RANGE_DAYS = { month: 30, quarter: 90, semester: 182, year: 365 };
+function sortedWeightHistory(){
+  const history = (userProfile && Array.isArray(userProfile.weightHistory)) ? userProfile.weightHistory : [];
+  return history
+    .filter(e => e && typeof e.weightKg === "number" && e.date)
+    .sort((a,b) => new Date(a.date) - new Date(b.date));
+}
+function filterWeightHistory(history, range){
+  if(range === "absolute" || !WEIGHT_RANGE_DAYS[range]) return history;
+  const cutoff = Date.now() - WEIGHT_RANGE_DAYS[range] * 24 * 60 * 60 * 1000;
+  return history.filter(e => new Date(e.date).getTime() >= cutoff);
+}
+function renderWeightProgress(){
+  const main = document.getElementById("main");
+  let html = progressViewTabsHtml();
+  html += `<div class="section-title"><h2>Peso corporal</h2></div>`;
+
+  const sorted = sortedWeightHistory();
+  if(sorted.length === 0){
+    html += `<div class="empty"><div class="empty-icon">${ICON_SCALE}</div>
+      <div>Todavía no has registrado ningún peso.<br>Usa el icono de la báscula (junto a tu cuenta, arriba) para introducir tu peso en ayunas y empezar a ver tu evolución.</div></div>`;
+    main.innerHTML = html;
+    wireProgressViewTabs();
+    return;
+  }
+
+  html += `<div class="filter-row">
+    <button data-r="month" class="${weightChartRange==='month'?'active':''}">Mensual</button>
+    <button data-r="quarter" class="${weightChartRange==='quarter'?'active':''}">Trimestral</button>
+    <button data-r="semester" class="${weightChartRange==='semester'?'active':''}">Semestral</button>
+    <button data-r="year" class="${weightChartRange==='year'?'active':''}">Anual</button>
+    <button data-r="absolute" class="${weightChartRange==='absolute'?'active':''}">Absoluto</button>
+  </div>`;
+
+  const filtered = filterWeightHistory(sorted, weightChartRange);
+  const values = filtered.map(e => e.weightKg);
+  const current = sorted[sorted.length - 1].weightKg;
+  const rangeLabels = { month: "el último mes", quarter: "el último trimestre", semester: "el último semestre", year: "el último año", absolute: "todo el historial" };
+
+  html += `<div class="stat-card">
+    <div class="stat-head"><h3>Evolución del peso corporal</h3></div>
+    <div class="stat-grid">
+      <div class="metric">
+        <div class="m-label">Peso actual</div>
+        <div class="m-value">${current} kg</div>
+      </div>
+      <div class="metric">
+        <div class="m-label">Pesajes registrados — ${rangeLabels[weightChartRange]}</div>
+        <div class="m-value">${filtered.length}</div>
+      </div>
+    </div>
+    <div class="chart-block">
+      <div class="m-label" style="margin-bottom:6px;">Peso corporal (kg) — ${rangeLabels[weightChartRange]}</div>
+      ${buildLineChartSvg(values, null, "Necesitas al menos dos pesajes registrados en este periodo para ver la gráfica. Prueba con \"Absoluto\" o sigue registrando tu peso semana a semana.")}
+    </div>
+  </div>`;
+
+  main.innerHTML = html;
+  wireProgressViewTabs();
+  main.querySelectorAll("[data-r]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ weightChartRange = btn.dataset.r; renderWeightProgress(); });
   });
 }
 
