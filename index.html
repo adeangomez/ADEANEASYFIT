@@ -622,23 +622,30 @@ async function loadUserData(){
 
 // Algunas cuentas creadas antes de que la librería cerrada quedara fijada
 // pueden tener nombres de ejercicio antiguos guardados en sus rutinas y su
-// historial (p. ej. "Pec deck / Aperturas de pecho" en vez de "Aperturas de
-// pecho en máquina"). Esto rompe el enlace con la foto y las estadísticas
-// del ejercicio. Esta función los corrige de forma silenciosa al entrar.
-const EXERCISE_NAME_MIGRATIONS = {
-  "Pec deck / Aperturas de pecho": "Aperturas de pecho en máquina",
-  "Pec deck/Aperturas de pecho": "Aperturas de pecho en máquina",
-  "Pec deck / aperturas de pecho": "Aperturas de pecho en máquina",
-  "Pec deck": "Aperturas de pecho en máquina",
-  "Aperturas de pecho": "Aperturas de pecho en máquina",
-  "Remo en barra T": "Remo en T",
-  "Remo barra T": "Remo en T",
-  "Remo en T agarre superior": "Remo en T",
-  "Remo T": "Remo en T",
-};
+// historial (p. ej. variantes de "Pec deck / Aperturas de pecho" en vez de
+// "Aperturas de pecho en máquina"). Esto rompe el enlace con la foto y las
+// estadísticas del ejercicio. Usamos coincidencia flexible (sin depender de
+// una cadena exacta) para no fallar por tildes, mayúsculas o pequeñas
+// erratas ("pec dec" vs "pec deck", con o sin espacios en las barras, etc.)
+function normalizeForMigration(s){
+  return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+function migratedExerciseName(name){
+  const n = normalizeForMigration(name);
+  if(n.includes("pec dec") || n.includes("pec-deck") || (n.includes("pecdeck"))){
+    return "Aperturas de pecho en máquina";
+  }
+  if(n === normalizeForMigration("Aperturas de pecho")){
+    return "Aperturas de pecho en máquina";
+  }
+  if(n.includes("remo") && n.includes(" t") || n.includes("remo t") || n.includes("remo en barra t")){
+    if(name !== "Remo en T") return "Remo en T";
+  }
+  return name;
+}
 async function migrateExerciseNames(){
   let changed = false;
-  const fix = (name) => EXERCISE_NAME_MIGRATIONS[name] || name;
+  const fix = (name) => migratedExerciseName(name);
 
   (plans || []).forEach(plan => {
     (plan.days || []).forEach(day => {
