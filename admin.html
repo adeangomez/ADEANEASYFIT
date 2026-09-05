@@ -623,27 +623,38 @@ function renderUserProgress(username, data){
   }
 
   // Día actual del circuito: se muestra siempre, y permite corregirlo a mano
-  // si alguna vez se desincroniza (herramienta de emergencia).
+  // si alguna vez se desincroniza (herramienta de emergencia). Se puede
+  // elegir cualquiera de las rutinas guardadas del usuario (no solo la
+  // activa) y, dentro de ella, el día concreto.
   let dayControlHtml = "";
-  const activePlan = (data.plans || []).find(p => p.id === data.activePlanId);
-  if(activePlan && Array.isArray(activePlan.days) && activePlan.days.length > 0){
+  const allPlans = (data.plans || []).filter(p => Array.isArray(p.days) && p.days.length > 0);
+  const activePlan = allPlans.find(p => p.id === data.activePlanId) || allPlans[0];
+  if(activePlan){
     const idx = (data.state && Number.isInteger(data.state.currentDayIndex)) ? data.state.currentDayIndex : 0;
     const currentDayName = activePlan.days[idx] ? activePlan.days[idx].name : "?";
+    const planPickerHtml = allPlans.length > 1
+      ? `<label>Rutina</label>
+         <select id="fixPlanSelect">
+           ${allPlans.map(p => `<option value="${p.id}" ${p.id === activePlan.id ? "selected" : ""}>${p.name}${p.id === data.activePlanId ? " (activa)" : ""}</option>`).join("")}
+         </select>`
+      : "";
     dayControlHtml = `<div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px;">
       <div style="font-size:11px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Día actual del circuito (${activePlan.name})</div>
       <div style="font-size:13.5px;margin-bottom:10px;">Le toca: <b>${currentDayName}</b> (día ${idx+1} de ${activePlan.days.length})</div>
       <label>Corregir manualmente si está desincronizado</label>
+      ${planPickerHtml}
       <select id="fixDaySelect">
         ${activePlan.days.map((d,i)=>`<option value="${i}" ${i===idx?"selected":""}>${i+1}. ${d.name}</option>`).join("")}
       </select>
       <button class="secondary" id="btnFixDay">Guardar día correcto</button>
       <div class="msg" id="fixDayMsg"></div>
+      ${allPlans.length > 1 ? `<div style="font-size:11px;color:var(--faint);margin-top:8px;">Si eliges una rutina distinta de la activa, esta pasará a ser la rutina activa del usuario al guardar.</div>` : ""}
     </div>`;
   }
 
   if(sessions.length === 0){
     container.innerHTML = profileHtml + dayControlHtml + '<div style="color:var(--faint);font-size:13px;margin-top:14px;">Este usuario todavía no tiene sesiones guardadas.</div>';
-    bindDayFixControl(username);
+    bindDayFixControl(username, data);
     return;
   }
 
@@ -719,20 +730,36 @@ function renderUserProgress(username, data){
     });
   });
 
-  bindDayFixControl(username);
+  bindDayFixControl(username, data);
 }
 
-function bindDayFixControl(username){
+function bindDayFixControl(username, data){
   const btn = document.getElementById("btnFixDay");
   if(!btn) return;
+
+  const allPlans = ((data && data.plans) || []).filter(p => Array.isArray(p.days) && p.days.length > 0);
+  const planSelect = document.getElementById("fixPlanSelect");
+  const daySelect = document.getElementById("fixDaySelect");
+
+  function repopulateDaySelect(){
+    if(!planSelect || !daySelect) return;
+    const plan = allPlans.find(p => p.id === planSelect.value);
+    if(!plan) return;
+    daySelect.innerHTML = plan.days.map((d,i)=>`<option value="${i}">${i+1}. ${d.name}</option>`).join("");
+  }
+
+  if(planSelect){
+    planSelect.addEventListener("change", repopulateDaySelect);
+  }
+
   btn.addEventListener("click", async () => {
     persistIfNeeded();
-    const select = document.getElementById("fixDaySelect");
     const msg = document.getElementById("fixDayMsg");
-    const dayIndex = Number(select.value);
+    const dayIndex = Number(daySelect.value);
+    const planId = planSelect ? planSelect.value : (data && data.activePlanId);
     btn.disabled = true; btn.textContent = "Guardando…";
     try{
-      await apiCall("/admin/set-day", { method: "POST", body: JSON.stringify({ username, dayIndex }) });
+      await apiCall("/admin/set-day", { method: "POST", body: JSON.stringify({ username, dayIndex, planId }) });
       showMsg(msg, "Día corregido correctamente.", true);
     }catch(e){
       showMsg(msg, "Error: " + e.message, false);
