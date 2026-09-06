@@ -37,11 +37,23 @@
   button{
     width:100%; background:var(--iron); color:#1a0b06; border:none; padding:12px;
     border-radius:10px; font-weight:700; font-size:13px; text-transform:uppercase; letter-spacing:0.01em; cursor:pointer;
-    transition: background .15s;
+    transition: background .15s, border-color .15s, transform .1s;
   }
-  button:hover{ background:#ff6d45; }
+  button:hover:not(:disabled){ background:#ff6d45; }
+  button:active:not(:disabled){ transform: scale(0.985); }
+  button:disabled{ opacity:0.55; cursor:default; }
   button.secondary{ background:var(--card2); color:var(--text); border:1px solid var(--line); }
+  button.secondary:hover:not(:disabled){ background:var(--line-soft); border-color:var(--faint); }
   button.danger{ background:rgba(242,80,79,0.1); color:var(--down); border:1px solid rgba(242,80,79,0.3); }
+  button.danger:hover:not(:disabled){ background:rgba(242,80,79,0.18); }
+
+  /* Accesibilidad: foco visible al navegar con teclado */
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline: 2px solid var(--iron); outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{ animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
   .msg{ font-size:12px; margin-top:10px; padding:9px 11px; border-radius:8px; display:none; }
   .msg.ok{ display:block; background:rgba(52,197,121,.12); color:var(--up); border:1px solid rgba(52,197,121,.3); }
   .msg.err{ display:block; background:rgba(242,80,79,.12); color:var(--down); border:1px solid rgba(242,80,79,.3); }
@@ -59,7 +71,9 @@
   select:focus{ outline:none; border-color:var(--iron); }
 
   .hist-card{ background:var(--card2); border:1px solid var(--line); border-radius:11px; margin-bottom:8px; overflow:hidden; }
-  .hist-card-top{ display:flex; justify-content:space-between; align-items:center; padding:12px 14px; cursor:pointer; }
+  .hist-card-top{ display:flex; justify-content:space-between; align-items:center; padding:12px 14px; cursor:pointer; transition: background .15s; }
+  .hist-card-top:hover{ background: rgba(255,255,255,0.03); }
+  .hist-card-top:active{ background: rgba(255,255,255,0.05); }
   .hist-card-date{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--faint); font-weight:700; margin-bottom:2px; }
   .hist-card-day{ font-size:13.5px; font-weight:600; }
   .chev{ color:var(--faint); font-size:18px; transition:transform .2s; }
@@ -84,7 +98,7 @@
     border-radius:9px; padding:11px 12px; font-size:14px; margin:14px 0 6px; font-family:inherit;
   }
   .prog-search:focus{ outline:none; border-color:var(--iron); }
-  .stat-card{ background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px; }
+  .stat-card{ background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px; box-shadow: 0 4px 12px -10px rgba(0,0,0,0.5); }
   .stat-card h3{ font-size:14px; margin:0 0 6px; font-family:'Space Grotesk',sans-serif; font-weight:700; }
   .stat-day-tags{ display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; }
   .stat-day-tag{ font-size:9.5px; font-weight:700; color:var(--dim); background:var(--card); border:1px solid var(--line); border-radius:100px; padding:3px 8px; }
@@ -642,9 +656,30 @@ function statMatchesQueryAdmin(name, dayNames, q){
   return false;
 }
 
+let adminProgressView = "peso"; // "peso" | "cargas"
+
 function renderUserProgress(username, data){
   const container = $("userProgressResult");
-  const sessions = (data.state && data.state.sessions) || [];
+  container.innerHTML = `
+    <div class="filter-row" style="margin-bottom:14px;">
+      <button data-apv="peso" class="${adminProgressView==='peso'?'active':''}">Peso corporal</button>
+      <button data-apv="cargas" class="${adminProgressView==='cargas'?'active':''}">Progreso de cargas</button>
+    </div>
+    <div id="adminProgressBody"></div>
+  `;
+  container.querySelectorAll("[data-apv]").forEach(btn=>{
+    btn.addEventListener("click", () => {
+      adminProgressView = btn.dataset.apv;
+      renderUserProgress(username, data);
+    });
+  });
+  if(adminProgressView === "cargas") renderAdminStrengthView(username, data);
+  else renderAdminWeightView(username, data);
+}
+
+// -------------------- Sub-pestaña: peso corporal --------------------
+function renderAdminWeightView(username, data){
+  const body = $("adminProgressBody");
 
   let profileHtml = "";
   if(data.profile){
@@ -656,7 +691,7 @@ function renderUserProgress(username, data){
            <button class="danger" id="btnRemoveAvatar" style="width:auto;">Quitar foto (moderación)</button>
          </div>`
       : "";
-    profileHtml = `<div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:16px;">
+    profileHtml = `<div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;">
       <div style="font-size:11px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Datos aportados por el usuario ${fecha ? `(${fecha})` : ""}</div>
       ${avatarThumbHtml}
       <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13.5px;">
@@ -666,11 +701,9 @@ function renderUserProgress(username, data){
       </div>
     </div>`;
   } else {
-    profileHtml = `<div style="color:var(--faint);font-size:12.5px;margin-top:16px;font-style:italic;">Este usuario todavía no ha completado el formulario de peso/altura/tiempo entrenando.</div>`;
+    profileHtml = `<div style="color:var(--faint);font-size:12.5px;font-style:italic;">Este usuario todavía no ha completado el formulario de peso/altura/tiempo entrenando.</div>`;
   }
 
-  // Evolución del peso corporal del usuario (mismo dato que ahora ve él
-  // mismo en la app, con los mismos filtros de rango).
   let weightSectionHtml = "";
   const weightHistory = ((data.profile && Array.isArray(data.profile.weightHistory)) ? data.profile.weightHistory : [])
     .filter(e => e && typeof e.weightKg === "number" && e.date)
@@ -691,11 +724,21 @@ function renderUserProgress(username, data){
       <div style="font-size:13.5px;margin-bottom:8px;">Peso actual: <b>${currentWeight} kg</b> · ${filteredWeight.length} pesaje${filteredWeight.length===1?'':'s'} en ${rangeLabelsAdmin[adminWeightChartRange]}</div>
       ${buildLineChartSvg(filteredWeight.map(e=>e.weightKg), null, "Necesitas al menos dos pesajes registrados en este periodo para ver la gráfica.")}
     </div>`;
+  } else {
+    weightSectionHtml = `<div style="color:var(--faint);font-size:12.5px;margin-top:16px;">Este usuario todavía no ha registrado ningún peso.</div>`;
   }
 
+  body.innerHTML = profileHtml + weightSectionHtml;
+  bindWeightRangeButtons(username, data);
+}
+
+// -------------------- Sub-pestaña: progreso de cargas --------------------
+function renderAdminStrengthView(username, data){
+  const body = $("adminProgressBody");
+  const sessions = (data.state && data.state.sessions) || [];
+
   if(sessions.length === 0){
-    container.innerHTML = profileHtml + weightSectionHtml + '<div style="color:var(--faint);font-size:13px;margin-top:14px;">Este usuario todavía no tiene sesiones guardadas.</div>';
-    bindWeightRangeButtons(username, data);
+    body.innerHTML = '<div style="color:var(--faint);font-size:13px;">Este usuario todavía no tiene sesiones guardadas.</div>';
     return;
   }
 
@@ -708,8 +751,7 @@ function renderUserProgress(username, data){
   });
   const filtered = allStats.filter(st => statMatchesQueryAdmin(st.name, st.dayNames, adminProgressSearchQuery));
 
-  let html = profileHtml + weightSectionHtml;
-  html += `<input type="text" class="prog-search" id="adminProgSearch" placeholder="Buscar por ejercicio, día ('Torso A') o grupo ('pecho')…" value="${String(adminProgressSearchQuery).replace(/"/g,"&quot;")}">`;
+  let html = `<input type="text" class="prog-search" id="adminProgSearch" placeholder="Buscar por ejercicio, día ('Torso A') o grupo ('pecho')…" value="${String(adminProgressSearchQuery).replace(/"/g,"&quot;")}">`;
 
   if(filtered.length === 0){
     html += `<div style="color:var(--faint);font-size:12.5px;padding:8px 0 4px;">Ningún ejercicio ni día coincide con la búsqueda.</div>`;
@@ -750,28 +792,26 @@ function renderUserProgress(username, data){
     html += `</div>`;
   });
 
-  container.innerHTML = html;
+  body.innerHTML = html;
 
   const searchInput = document.getElementById("adminProgSearch");
   if(searchInput){
     searchInput.addEventListener("input", (e) => {
       adminProgressSearchQuery = e.target.value;
-      renderUserProgress(username, data);
+      renderAdminStrengthView(username, data);
       const el = document.getElementById("adminProgSearch");
       if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     });
   }
 
-  container.querySelectorAll("[data-toggle]").forEach(el => {
+  body.querySelectorAll("[data-toggle]").forEach(el => {
     el.addEventListener("click", () => {
       const id = Number(el.dataset.toggle);
       if(adminExpandedIds.has(id)) adminExpandedIds.delete(id);
       else adminExpandedIds.add(id);
-      renderUserProgress(username, data);
+      renderAdminStrengthView(username, data);
     });
   });
-
-  bindWeightRangeButtons(username, data);
 }
 
 // -------------------- Peso corporal (rango) en Progreso admin --------------------
@@ -783,10 +823,10 @@ function filterWeightHistoryAdmin(history, range){
   return history.filter(e => new Date(e.date).getTime() >= cutoff);
 }
 function bindWeightRangeButtons(username, data){
-  document.querySelectorAll("#userProgressResult [data-wr]").forEach(btn=>{
+  document.querySelectorAll("#adminProgressBody [data-wr]").forEach(btn=>{
     btn.addEventListener("click", () => {
       adminWeightChartRange = btn.dataset.wr;
-      renderUserProgress(username, data);
+      renderAdminWeightView(username, data);
     });
   });
   const removeAvatarBtn = document.getElementById("btnRemoveAvatar");
