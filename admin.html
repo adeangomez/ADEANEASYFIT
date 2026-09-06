@@ -188,7 +188,6 @@
       <select id="progressUserSelect">
         <option value="">— Elige un usuario —</option>
       </select>
-      <button id="btnViewProgress">Ver progreso</button>
       <div class="msg" id="progressMsg"></div>
       <div id="userProgressResult"></div>
     </div>
@@ -941,19 +940,22 @@ function bindDayFixControl(username, data){
   });
 }
 
-$("btnViewProgress").addEventListener("click", async () => {
-  persistIfNeeded();
-  const username = $("progressUserSelect").value;
+async function loadUserProgressFor(username){
   const msg = $("progressMsg");
   const container = $("userProgressResult");
   if(!username){
-    showMsg(msg, "Elige primero un usuario de la lista.", false);
+    container.innerHTML = "";
+    msg.className = "msg";
     return;
   }
   msg.className = "msg";
   container.innerHTML = '<div style="color:var(--faint);font-size:13px;margin-top:14px;">Cargando…</div>';
   try{
     const data = await apiCall("/admin/user-data", { method:"POST", body: JSON.stringify({ username }) });
+    // Se reinician al cambiar de usuario para que no se arrastren cosas del
+    // usuario anterior (una búsqueda escrita, sesiones expandidas, un rango
+    // de fechas) que podían hacer que la pantalla pareciera "atascada" al
+    // mostrar datos que no encajaban con el usuario nuevo.
     adminExpandedIds = new Set();
     adminProgressSearchQuery = "";
     adminWeightChartRange = "absolute";
@@ -962,6 +964,11 @@ $("btnViewProgress").addEventListener("click", async () => {
     showMsg(msg, "Error: " + e.message, false);
     container.innerHTML = "";
   }
+}
+
+$("progressUserSelect").addEventListener("change", () => {
+  persistIfNeeded();
+  loadUserProgressFor($("progressUserSelect").value);
 });
 
 $("btnLoadDayFix").addEventListener("click", async () => {
