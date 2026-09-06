@@ -155,11 +155,13 @@
 
   <div id="section-users" class="admin-section">
     <div class="filter-row" style="margin-bottom:16px;">
-      <button data-usv="crear" class="active">Crear usuario</button>
+      <button data-usv="crear">Crear usuario</button>
       <button data-usv="existentes">Usuarios existentes</button>
     </div>
 
-    <div id="usersSubCrear">
+    <div id="usersSubPlaceholder" style="color:var(--faint);font-size:12.5px;text-align:center;padding:30px 10px;">Elige una opción arriba para empezar.</div>
+
+    <div id="usersSubCrear" style="display:none;">
       <div class="card">
         <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Crear usuario nuevo</h2>
         <label>Usuario</label>
@@ -303,6 +305,7 @@ document.querySelectorAll("[data-usv]").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll("[data-usv]").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
+    $("usersSubPlaceholder").style.display = "none";
     $("usersSubCrear").style.display = btn.dataset.usv === "crear" ? "block" : "none";
     $("usersSubExistentes").style.display = btn.dataset.usv === "existentes" ? "block" : "none";
     if(btn.dataset.usv === "existentes" && $("userList").children.length === 0){
