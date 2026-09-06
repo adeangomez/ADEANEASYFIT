@@ -154,21 +154,30 @@
   </nav>
 
   <div id="section-users" class="admin-section">
-    <div class="card">
-      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Crear usuario nuevo</h2>
-      <label>Usuario</label>
-      <input id="newUsername" placeholder="p. ej. adrian" />
-      <label>Contraseña</label>
-      <input id="newPassword" type="text" placeholder="mínimo 4 caracteres" />
-      <button id="btnCreate">Crear usuario</button>
-      <div class="msg" id="createMsg"></div>
+    <div class="filter-row" style="margin-bottom:16px;">
+      <button data-usv="crear" class="active">Crear usuario</button>
+      <button data-usv="existentes">Usuarios existentes</button>
     </div>
 
-    <div class="card">
-      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Usuarios existentes</h2>
-      <button class="secondary" id="btnList">Actualizar lista</button>
-      <ul id="userList" style="margin-top:14px;"></ul>
-      <div class="msg" id="listMsg"></div>
+    <div id="usersSubCrear">
+      <div class="card">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Crear usuario nuevo</h2>
+        <label>Usuario</label>
+        <input id="newUsername" placeholder="p. ej. adrian" />
+        <label>Contraseña</label>
+        <input id="newPassword" type="text" placeholder="mínimo 4 caracteres" />
+        <button id="btnCreate">Crear usuario</button>
+        <div class="msg" id="createMsg"></div>
+      </div>
+    </div>
+
+    <div id="usersSubExistentes" style="display:none;">
+      <div class="card">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Usuarios existentes</h2>
+        <button class="secondary" id="btnList">Actualizar lista</button>
+        <ul id="userList" style="margin-top:14px;"></ul>
+        <div class="msg" id="listMsg"></div>
+      </div>
     </div>
   </div>
 
@@ -288,6 +297,18 @@ document.querySelectorAll(".admin-tabs button").forEach(btn => {
     btn.classList.add("tab-active");
     document.querySelectorAll(".admin-section").forEach(s => s.style.display = "none");
     $("section-" + btn.dataset.section).style.display = "block";
+  });
+});
+
+document.querySelectorAll("[data-usv]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("[data-usv]").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    $("usersSubCrear").style.display = btn.dataset.usv === "crear" ? "block" : "none";
+    $("usersSubExistentes").style.display = btn.dataset.usv === "existentes" ? "block" : "none";
+    if(btn.dataset.usv === "existentes" && $("userList").children.length === 0){
+      $("btnList").click();
+    }
   });
 });
 
