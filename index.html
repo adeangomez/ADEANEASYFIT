@@ -70,11 +70,14 @@
 
   /* DAY TRACK */
   .track{ display:flex; align-items:center; gap:5px; margin-top:18px; }
-  .track-node{ flex:1; height:5px; border-radius:3px; background: var(--lock); position:relative; transition: background .25s; }
+  .track-node{ flex:1; height:5px; border-radius:3px; background: var(--lock); position:relative; transition: background .25s, transform .1s; cursor:pointer; }
+  .track-node:hover{ background: var(--text-faint); }
+  .track-node:active{ transform: scaleY(1.6); }
   .track-node.done{ background: var(--steel); }
   .track-node.active{ background: var(--iron); box-shadow: 0 0 8px rgba(255,90,46,0.45); }
   .track-labels{ display:flex; margin-top:8px; }
-  .track-labels span{ flex:1; text-align:center; font-size:9px; letter-spacing:0.05em; color:var(--text-faint); text-transform:uppercase; font-weight:600; }
+  .track-labels span{ flex:1; text-align:center; font-size:9px; letter-spacing:0.05em; color:var(--text-faint); text-transform:uppercase; font-weight:600; cursor:pointer; }
+  .track-labels span:hover{ color:var(--text-dim); }
   .track-labels span.active{ color:var(--iron); font-weight:700; }
 
   /* NAV TABS */
@@ -162,6 +165,38 @@
   .last-time b{ color:var(--steel); font-weight:700; }
 
   .save-bar{ margin-top: 8px; padding: 4px 2px 20px; }
+
+  /* TEMPORIZADOR DE DESCANSO */
+  #restTimerWidget{
+    position: fixed; left:12px; right:12px; bottom: calc(78px + var(--safe-bottom) + 10px);
+    z-index: 25; display:flex; justify-content:center;
+  }
+  #restTimerWidget:empty{ display:none; }
+  .rest-timer{
+    width:100%; max-width:460px; background: rgba(24,25,30,0.96); border:1px solid var(--line-soft);
+    border-radius: 14px; box-shadow: 0 8px 24px -10px rgba(0,0,0,0.6);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); overflow:hidden; position:relative;
+  }
+  .rest-timer-picker{ display:flex; align-items:center; gap:6px; padding:9px 10px; }
+  .rest-timer-ic{ width:16px; height:16px; color:var(--iron); flex-shrink:0; display:flex; }
+  .rest-timer-ic svg{ width:100%; height:100%; }
+  .rest-timer-sub{ font-size:11.5px; color:var(--text-dim); font-weight:600; margin-right:2px; }
+  .rest-timer-options{ display:flex; gap:5px; flex:1; }
+  .rest-timer-options button{
+    flex:1; min-width:0; background:var(--card-2); border:1px solid var(--line); color:var(--text-dim);
+    padding:7px 2px; border-radius:9px; font-size:11px; font-weight:700; cursor:pointer;
+    transition: background .15s, border-color .15s, transform .1s;
+  }
+  .rest-timer-options button:hover{ background:var(--line-soft); border-color:var(--text-faint); color:var(--text); }
+  .rest-timer-options button:active{ transform: scale(0.94); }
+  .rest-timer-running .rest-timer-row{ display:flex; align-items:center; gap:8px; padding:10px 14px; position:relative; z-index:1; }
+  .rest-timer-fill{ position:absolute; inset:0; background: linear-gradient(90deg, rgba(255,90,46,0.28), rgba(255,90,46,0.12)); transition: width .25s linear; }
+  .rest-timer-time{ font-family:'JetBrains Mono', monospace; font-size:16px; font-weight:700; color:var(--text); letter-spacing:0.02em; }
+  .rest-timer-cancel{
+    margin-left:auto; background:none; border:none; color:var(--text-faint); font-size:11px; font-weight:600;
+    cursor:pointer; padding:6px 8px; text-transform:uppercase; letter-spacing:0.03em;
+  }
+  .rest-timer-cancel:hover{ color:var(--down); }
   .btn-primary{ width:100%; background: var(--iron); color:#1a0b06; border:none; padding: 15px; border-radius: 12px; font-size:14.5px; font-weight:700; letter-spacing:0.01em; text-transform:uppercase; cursor:pointer; transition: background .15s; }
   .btn-primary:hover{ background: var(--iron-hover); }
   .btn-primary:active{ transform: scale(0.985); }
@@ -304,6 +339,20 @@
   .modal-overlay.closing{ animation: modalBackdropOut 0.18s ease forwards; }
   .modal-sheet{ width:100%; max-width:460px; background: var(--card); border-radius: 18px 18px 0 0; padding: 22px 20px calc(24px + var(--safe-bottom)); border-top:1px solid var(--line-soft); animation: modalSheetIn 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
   .modal-overlay.closing .modal-sheet{ animation: modalSheetOut 0.18s ease forwards; }
+
+  /* CELEBRACIÓN DE RÉCORD */
+  .record-trophy{
+    width:60px; height:60px; margin:0 auto 14px; border-radius:50%;
+    background: var(--iron-dim, rgba(255,90,46,0.15)); color: var(--iron);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .record-trophy svg{ width:30px; height:30px; }
+  .record-list{ margin: 16px 0 18px; display:flex; flex-direction:column; gap:10px; }
+  .record-item{ background: var(--card-2); border:1px solid var(--line-soft); border-radius:12px; padding:12px 14px; text-align:center; }
+  .record-item-name{ font-size:13px; font-weight:700; color:var(--text); margin-bottom:4px; }
+  .record-item-value{ font-size:13.5px; color:var(--text-dim); }
+  .record-item-value b{ color:var(--iron); }
+  .record-item-prev{ font-size:11px; color:var(--text-faint); }
   @keyframes modalBackdropIn{ from{ opacity:0; } to{ opacity:1; } }
   @keyframes modalBackdropOut{ from{ opacity:1; } to{ opacity:0; } }
   @keyframes modalSheetIn{ from{ transform:translateY(28px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
@@ -498,6 +547,8 @@ const ICON_TRASH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_CHEVRON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,6 15,12 9,18"/></svg>`;
 const ICON_LOCK_INLINE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:inline-block;vertical-align:-2px;margin-right:4px;"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>`;
 const ICON_SCALE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 8h8M12 8v8M8.5 12a3.5 3.5 0 007 0"/></svg>`;
+const ICON_TIMER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg>`;
+const ICON_TROPHY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 5H4a1 1 0 00-1 1 5 5 0 004 4.9M17 5h3a1 1 0 011 1 5 5 0 01-4 4.9"/></svg>`;
 
 const API_BASE = "https://adeanfit-api.adeangomez873.workers.dev";
 const AUTH_TOKEN_KEY = "adeanfit_auth_token";
@@ -948,6 +999,7 @@ function renderApp(){
     <main id="main">
       <div class="loading"><div class="spinner"></div><div>Cargando tu progreso…</div></div>
     </main>
+    <div id="restTimerWidget"></div>
     <nav class="tabs">
       <button data-tab="train" class="active"><span class="ic">${ICON_TRAIN}</span>Entrenar</button>
       <button data-tab="cardio"><span class="ic">${ICON_CARDIO}</span>Cardio</button>
@@ -1402,15 +1454,37 @@ function renderTrack(){
   days.forEach((d,i)=>{
     const node = document.createElement("div");
     node.className = "track-node" + (i === state.currentDayIndex ? " active" : (i < state.currentDayIndex ? " done" : ""));
+    node.addEventListener("click", ()=> selectTrainDay(i));
     track.appendChild(node);
     const lab = document.createElement("span");
     lab.textContent = d.name.split(" ")[0] + (d.name.split(" ")[1] ? " "+d.name.split(" ")[1] : "");
     if(i === state.currentDayIndex) lab.className = "active";
+    lab.addEventListener("click", ()=> selectTrainDay(i));
     labels.appendChild(lab);
   });
   const plan = activePlan();
   headerTag.textContent =
-    (plan ? plan.name + " · " : "") + "Sesión " + (state.sessions.length + 1) + " · Orden fijo, sin elegir día";
+    (plan ? plan.name + " · " : "") + "Sesión " + (state.sessions.length + 1) + " · Toca un día para cambiarlo";
+}
+
+// Permite elegir libremente qué día de la rutina entrenar, en vez de forzar
+// siempre el orden estricto (útil si te saltas un día o entrenas fuera de
+// orden). Al guardar una sesión se sigue avanzando automáticamente al
+// siguiente, pero en cualquier momento puedes tocar otro día del carril.
+async function selectTrainDay(index){
+  const days = activeDays();
+  if(index === state.currentDayIndex || index < 0 || index >= days.length) return;
+  if(isSavingSession) return;
+  const previous = state.currentDayIndex;
+  state.currentDayIndex = index;
+  render();
+  try{
+    await apiSaveData();
+  }catch(err){
+    state.currentDayIndex = previous;
+    alert("No se pudo cambiar de día: " + err.message);
+    render();
+  }
 }
 
 function lastTimeFor(exerciseName){
@@ -1485,7 +1559,7 @@ function renderTrain(){
   html += `
       <div class="save-bar">
         <button type="submit" class="btn-primary" id="saveSessionBtn">Guardar entrenamiento y pasar al siguiente día</button>
-        <div class="hint">Al guardar se registra la sesión de <b>${day.name}</b> y el circuito avanza automáticamente a <b>${days[(state.currentDayIndex+1)%days.length].name}</b>. No puedes elegir otro día.</div>
+        <div class="hint">Al guardar se registra la sesión de <b>${day.name}</b> y el circuito avanza automáticamente a <b>${days[(state.currentDayIndex+1)%days.length].name}</b>. Puedes tocar cualquier día del carril de arriba para cambiarlo manualmente.</div>
       </div>
     </form>
   `;
@@ -1519,6 +1593,94 @@ function startSaveCooldownTimer(){
     btn.textContent = `Espera ${Math.ceil(remaining/1000)}s antes de guardar otro día…`;
   }
   tick();
+}
+
+// =======================================================================
+// TEMPORIZADOR DE DESCANSO
+// =======================================================================
+let restTimerEndAt = null;
+let restTimerTotalMs = null;
+let restTimerIntervalId = null;
+
+function renderRestTimerWidget(){
+  const el = document.getElementById("restTimerWidget");
+  if(!el) return;
+
+  if(restTimerEndAt){
+    const remainingMs = Math.max(0, restTimerEndAt - Date.now());
+    if(remainingMs <= 0){
+      stopRestTimer(true);
+      return;
+    }
+    const totalSec = Math.ceil(remainingMs / 1000);
+    const mm = Math.floor(totalSec / 60);
+    const ss = totalSec % 60;
+    const pct = restTimerTotalMs ? Math.max(0, Math.min(100, 100 - (remainingMs / restTimerTotalMs) * 100)) : 0;
+    el.innerHTML = `<div class="rest-timer rest-timer-running">
+      <div class="rest-timer-fill" style="width:${pct}%"></div>
+      <div class="rest-timer-row">
+        <span class="rest-timer-ic">${ICON_TIMER}</span>
+        <span class="rest-timer-time">${mm}:${String(ss).padStart(2,"0")}</span>
+        <span class="rest-timer-sub">Descansando…</span>
+        <button type="button" class="rest-timer-cancel" id="restTimerCancelBtn">Cancelar</button>
+      </div>
+    </div>`;
+    const cancelBtn = document.getElementById("restTimerCancelBtn");
+    if(cancelBtn) cancelBtn.addEventListener("click", ()=> stopRestTimer(false));
+  } else {
+    if(activeTab !== "train"){ el.innerHTML = ""; return; }
+    el.innerHTML = `<div class="rest-timer rest-timer-picker">
+      <span class="rest-timer-ic" title="Descanso">${ICON_TIMER}</span>
+      <div class="rest-timer-options">
+        <button type="button" data-sec="60">1:00</button>
+        <button type="button" data-sec="90">1:30</button>
+        <button type="button" data-sec="120">2:00</button>
+        <button type="button" data-sec="150">2:30</button>
+        <button type="button" data-sec="180">3:00</button>
+      </div>
+    </div>`;
+    el.querySelectorAll("[data-sec]").forEach(btn=>{
+      btn.addEventListener("click", ()=> startRestTimer(Number(btn.dataset.sec)));
+    });
+  }
+}
+
+function startRestTimer(seconds){
+  restTimerTotalMs = seconds * 1000;
+  restTimerEndAt = Date.now() + restTimerTotalMs;
+  if(restTimerIntervalId) clearInterval(restTimerIntervalId);
+  restTimerIntervalId = setInterval(renderRestTimerWidget, 250);
+  renderRestTimerWidget();
+}
+
+function stopRestTimer(finished){
+  if(restTimerIntervalId){ clearInterval(restTimerIntervalId); restTimerIntervalId = null; }
+  restTimerEndAt = null;
+  restTimerTotalMs = null;
+  renderRestTimerWidget();
+  if(finished){
+    if(navigator.vibrate) navigator.vibrate([200,100,200]);
+    playRestTimerSound();
+  }
+}
+
+function playRestTimerSound(){
+  try{
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return;
+    const ctx = new Ctx();
+    [0, 0.18].forEach(delay=>{
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = "sine"; o.frequency.value = 880;
+      const t0 = ctx.currentTime + delay;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.35, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
+      o.start(t0); o.stop(t0 + 0.35);
+    });
+  }catch(e){ /* silencioso si el navegador bloquea audio */ }
 }
 
 async function onSaveSession(e){
@@ -1564,6 +1726,11 @@ async function onSaveSession(e){
       })
     };
 
+    // Se detectan los récords ANTES de guardar la sesión nueva, comparando
+    // contra el historial que había hasta ahora mismo.
+    const newRecords = detectSessionRecords(day, data);
+    const eligibleForCelebration = hasBeenTrainingLongEnough();
+
     const newDayIndex = (state.currentDayIndex + 1) % days.length;
     state.sessions.push(session);
     state.currentDayIndex = newDayIndex;
@@ -1584,9 +1751,71 @@ async function onSaveSession(e){
 
     render();
     window.scrollTo({top:0, behavior:"smooth"});
+
+    // Solo se celebra si llevas al menos un mes registrando entrenamientos:
+    // al principio casi cualquier sesión sería "récord" por falta de
+    // historial, y perdería la gracia si saliera constantemente.
+    if(newRecords.length > 0 && eligibleForCelebration){
+      showRecordCelebration(newRecords);
+    }
   } finally {
     isSavingSession = false;
   }
+}
+
+// Compara lo recién introducido (aún sin guardar) contra el historial previo
+// de cada ejercicio del día, y devuelve los que superan su máximo anterior.
+function detectSessionRecords(day, data){
+  const records = [];
+  day.exercises.forEach((ex, exIdx)=>{
+    const setsData = data[exIdx] || {};
+    let sessionMax = 0, sessionMaxReps = 0;
+    Object.values(setsData).forEach(s=>{
+      if((s.kg||0) > sessionMax){ sessionMax = s.kg||0; sessionMaxReps = s.reps||0; }
+    });
+    if(sessionMax <= 0) return;
+    const priorSeries = buildExerciseTimeSeries(ex.name); // usa state.sessions ANTES de añadir la nueva
+    if(priorSeries.length === 0) return; // sin historial previo no hay récord que batir todavía
+    const prevMax = Math.max(...priorSeries.map(p=>p.maxKg));
+    if(sessionMax > prevMax){
+      records.push({ name: ex.name, kg: sessionMax, reps: sessionMaxReps, prevKg: prevMax });
+    }
+  });
+  return records;
+}
+
+const RECORD_CELEBRATION_MIN_MS = 30 * 24 * 60 * 60 * 1000;
+function hasBeenTrainingLongEnough(){
+  if(!state.sessions || state.sessions.length === 0) return false;
+  let earliest = null;
+  state.sessions.forEach(s=>{
+    const t = new Date(s.date).getTime();
+    if(earliest === null || t < earliest) earliest = t;
+  });
+  if(earliest === null) return false;
+  return (Date.now() - earliest) >= RECORD_CELEBRATION_MIN_MS;
+}
+
+function showRecordCelebration(records){
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-sheet record-modal">
+      <div class="record-trophy">${ICON_TROPHY}</div>
+      <h3 style="text-align:center;">${records.length === 1 ? "¡Nuevo récord!" : "¡Nuevos récords!"}</h3>
+      <div class="record-list">
+        ${records.map(r => `<div class="record-item">
+          <div class="record-item-name">${r.name}</div>
+          <div class="record-item-value"><b>${r.kg} kg</b> × ${r.reps} <span class="record-item-prev">(antes: ${r.prevKg} kg)</span></div>
+        </div>`).join("")}
+      </div>
+      <button class="btn-primary" id="recordCelebrationClose">Genial</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeModal(overlay); });
+  document.getElementById("recordCelebrationClose").addEventListener("click", ()=> closeModal(overlay));
+  if(navigator.vibrate) navigator.vibrate([80,40,80,40,140]);
 }
 
 // =======================================================================
@@ -2532,6 +2761,7 @@ function render(){
   document.querySelectorAll("nav.tabs button").forEach(b=>{
     b.classList.toggle("active", b.dataset.tab === activeTab);
   });
+  renderRestTimerWidget();
 }
 
 function renderCardio(){
