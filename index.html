@@ -386,7 +386,7 @@ const DEFAULT_DAYS_SEED = [
     { name: "Curl femoral sentado", sets: 3 },
     { name: "Extensión de gemelo sentado", sets: 3 },
     { name: "Dragon flags de abdomen", sets: 3 },
-    { name: "Rotaciones de oblicuos", sets: 3 },
+    { name: "Rotación de oblicuos en poleas", sets: 3 },
   ]},
 ];
 
@@ -781,6 +781,9 @@ function migratedExerciseName(name){
   }
   if(n === normalizeForMigration("Crunch invertido")){
     return "Dragon flags de abdomen";
+  }
+  if(n === normalizeForMigration("Rotaciones de oblicuos")){
+    return "Rotación de oblicuos en poleas";
   }
   return name;
 }
