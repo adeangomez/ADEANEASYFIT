@@ -406,6 +406,8 @@ const EXERCISE_LIBRARY = [
   { name: "Rotación de oblicuos en poleas", muscle: "Abdomen" },
   { name: "Rueda abdominal", muscle: "Abdomen" },
   { name: "Crunch de abdomen en máquina", muscle: "Abdomen" },
+  { name: "Curl femoral tumbado", muscle: "Pierna", sub: "Femoral" },
+  { name: "Curl femoral sentado", muscle: "Pierna", sub: "Femoral" },
 ];
 function findExerciseByName(name){ return EXERCISE_LIBRARY.find(e => e.name === name); }
 
@@ -416,6 +418,13 @@ const MUSCLE_SYNONYMS = {
   "Bíceps": ["biceps", "bíceps", "brazo", "brazos", "curl", "arm", "arms", "bicep"],
   "Tríceps": ["triceps", "tríceps", "tricep"],
   "Abdomen": ["abdomen", "abdominales", "abs", "core", "oblicuos", "oblicuo", "sixpack", "six pack"],
+  "Pierna": ["pierna", "piernas", "leg", "legs"],
+};
+const SUB_SYNONYMS = {
+  "Femoral": ["femoral", "femorales", "isquios", "isquiotibiales", "hamstring", "hamstrings"],
+  "Cuádriceps": ["cuadriceps", "cuádriceps", "quad", "quads", "quadriceps"],
+  "Glúteo": ["gluteo", "glúteo", "gluteos", "glúteos", "gluteus", "glutes", "culo"],
+  "Gemelo": ["gemelo", "gemelos", "pantorrilla", "pantorrillas", "calf", "calves"],
 };
 function normalizeText(s){
   return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -691,6 +700,10 @@ function statMatchesQueryAdmin(name, dayNames, q){
   if(dayNames.some(d => normalizeText(d).includes(nq))) return true;
   const libEx = findExerciseByName(name);
   if(libEx){
+    if(libEx.sub){
+      const subSyns = SUB_SYNONYMS[libEx.sub] || [normalizeText(libEx.sub)];
+      if(subSyns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s)))) return true;
+    }
     const allMuscles = [libEx.muscle, ...(libEx.secondary||[])];
     if(allMuscles.some(m => {
       const syns = MUSCLE_SYNONYMS[m] || [];
