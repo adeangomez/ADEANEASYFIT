@@ -398,41 +398,41 @@ const ASSETS_BASE = "https://adeangomez.github.io/ADEANEASYFIT/assets/ejercicios
 const EXERCISE_LIBRARY = [
   { id: "aperturas-pecho-maquina",     name: "Aperturas de pecho en máquina", muscle: "Pecho" },
   { id: "aperturas-pecho-poleas",      name: "Aperturas de pecho en poleas",  muscle: "Pecho" },
-  { id: "flexiones",                   name: "Flexiones",                    muscle: "Pecho" },
-  { id: "fondos-maquina",              name: "Fondos en máquina",            muscle: "Pecho" },
-  { id: "fondos-paralelas",            name: "Fondos en paralelas",          muscle: "Pecho" },
-  { id: "press-declinado-barra",       name: "Press declinado con barra",    muscle: "Pecho" },
-  { id: "press-pecho-maquina",         name: "Press de pecho en máquina",    muscle: "Pecho" },
-  { id: "press-inclinado-maquina",     name: "Press inclinado en máquina",   muscle: "Pecho" },
-  { id: "press-inclinado-mancuernas",  name: "Press inclinado con mancuernas", muscle: "Pecho" },
-  { id: "press-inclinado-smith",       name: "Press inclinado en Smith",     muscle: "Pecho" },
-  { id: "press-plano-mancuernas",      name: "Press plano con mancuernas",   muscle: "Pecho" },
-  { id: "press-plano-smith",           name: "Press plano en Smith",         muscle: "Pecho" },
-  { id: "pullover-mancuerna",          name: "Pull-over con mancuerna",      muscle: "Pecho" },
-  { id: "press-banca",                 name: "Press banca",                  muscle: "Pecho" },
-  { id: "dominadas",                   name: "Dominadas",                    muscle: "Espalda" },
+  { id: "flexiones",                   name: "Flexiones",                    muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "fondos-maquina",              name: "Fondos en máquina",            muscle: "Pecho", secondary: ["Tríceps"] },
+  { id: "fondos-paralelas",            name: "Fondos en paralelas",          muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "press-declinado-barra",       name: "Press declinado con barra",    muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "press-pecho-maquina",         name: "Press de pecho en máquina",    muscle: "Pecho", secondary: ["Tríceps"] },
+  { id: "press-inclinado-maquina",     name: "Press inclinado en máquina",   muscle: "Pecho", secondary: ["Tríceps"] },
+  { id: "press-inclinado-mancuernas",  name: "Press inclinado con mancuernas", muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "press-inclinado-smith",       name: "Press inclinado en Smith",     muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "press-plano-mancuernas",      name: "Press plano con mancuernas",   muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "press-plano-smith",           name: "Press plano en Smith",         muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "pullover-mancuerna",          name: "Pull-over con mancuerna",      muscle: "Pecho", secondary: ["Espalda"] },
+  { id: "press-banca",                 name: "Press banca",                  muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "dominadas",                   name: "Dominadas",                    muscle: "Espalda", secondary: ["Bíceps"] },
   { id: "encogimientos-mancuernas",    name: "Encogimientos con mancuernas", muscle: "Espalda" },
-  { id: "jalon-al-pecho",              name: "Jalón al pecho",               muscle: "Espalda" },
-  { id: "jalon-maquina",               name: "Jalón en máquina",             muscle: "Espalda" },
-  { id: "peso-muerto",                 name: "Peso muerto",                  muscle: "Espalda" },
-  { id: "remo-mancuernas",             name: "Remo con mancuernas",          muscle: "Espalda" },
-  { id: "remo-barra",                  name: "Remo con barra",               muscle: "Espalda" },
-  { id: "remo-maquina",                name: "Remo en máquina",              muscle: "Espalda" },
-  { id: "remo-t",                      name: "Remo en T",                    muscle: "Espalda" },
+  { id: "jalon-al-pecho",              name: "Jalón al pecho",               muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "jalon-maquina",               name: "Jalón en máquina",             muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "peso-muerto",                 name: "Peso muerto",                  muscle: "Espalda", secondary: ["Glúteo", "Femoral"] },
+  { id: "remo-mancuernas",             name: "Remo con mancuernas",          muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "remo-barra",                  name: "Remo con barra",               muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "remo-maquina",                name: "Remo en máquina",              muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "remo-t",                      name: "Remo en T",                    muscle: "Espalda", secondary: ["Bíceps"] },
   { id: "face-pull",                   name: "Face pull",                    muscle: "Espalda", secondary: ["Hombro"] },
-  { id: "extension-lumbar",            name: "Extensión lumbar",             muscle: "Espalda" },
-  { id: "jalon-agarre-cerrado-supino", name: "Jalón con agarre cerrado supino", muscle: "Espalda" },
+  { id: "extension-lumbar",            name: "Extensión lumbar",             muscle: "Espalda", secondary: ["Glúteo", "Femoral"] },
+  { id: "jalon-agarre-cerrado-supino", name: "Jalón con agarre cerrado supino", muscle: "Espalda", secondary: ["Bíceps"] },
   { id: "elevaciones-frontales-mancuernas", name: "Elevaciones frontales con mancuernas", muscle: "Hombro" },
-  { id: "pajaritos",                   name: "Pajaritos",                    muscle: "Hombro" },
+  { id: "pajaritos",                   name: "Pajaritos",                    muscle: "Hombro", secondary: ["Espalda"] },
   { id: "pec-deck-posterior-invertido", name: "Pec deck posterior invertido", muscle: "Hombro", secondary: ["Espalda"] },
-  { id: "press-militar-mancuernas",    name: "Press militar con mancuernas", muscle: "Hombro" },
+  { id: "press-militar-mancuernas",    name: "Press militar con mancuernas", muscle: "Hombro", secondary: ["Tríceps"] },
   { id: "aperturas-hombro-poleas",     name: "Aperturas de hombro en poleas", muscle: "Hombro" },
   { id: "aperturas-hombro",            name: "Aperturas de hombro",          muscle: "Hombro" },
-  { id: "press-militar-barra",         name: "Press militar con barra",      muscle: "Hombro" },
-  { id: "remo-vertical",               name: "Remo vertical",                muscle: "Hombro" },
-  { id: "press-militar-maquina",       name: "Press militar en máquina",     muscle: "Hombro" },
+  { id: "press-militar-barra",         name: "Press militar con barra",      muscle: "Hombro", secondary: ["Tríceps"] },
+  { id: "remo-vertical",               name: "Remo vertical",                muscle: "Hombro", secondary: ["Espalda"] },
+  { id: "press-militar-maquina",       name: "Press militar en máquina",     muscle: "Hombro", secondary: ["Tríceps"] },
   { id: "aperturas-hombro-maquina",    name: "Apertura de hombro en máquina", muscle: "Hombro" },
-  { id: "press-arnold",                name: "Press Arnold",                 muscle: "Hombro" },
+  { id: "press-arnold",                name: "Press Arnold",                 muscle: "Hombro", secondary: ["Tríceps"] },
   { id: "curl-barra-recta",            name: "Curl con barra recta",         muscle: "Bíceps" },
   { id: "curl-barra-z",                name: "Curl con barra Z",             muscle: "Bíceps" },
   { id: "curl-polea",                  name: "Curl en polea",                muscle: "Bíceps" },
@@ -448,9 +448,9 @@ const EXERCISE_LIBRARY = [
   { id: "patada-triceps-mancuerna",    name: "Patada de tríceps con mancuerna", muscle: "Tríceps" },
   { id: "press-frances-barra-z",       name: "Press francés con barra Z",    muscle: "Tríceps" },
   { id: "press-triceps-maquina",       name: "Press de tríceps en máquina",  muscle: "Tríceps" },
-  { id: "flexion-diamante-triceps",    name: "Flexión diamante de tríceps",  muscle: "Tríceps" },
+  { id: "flexion-diamante-triceps",    name: "Flexión diamante de tríceps",  muscle: "Tríceps", secondary: ["Pecho", "Hombro"] },
   { id: "fondos-maquina-triceps",      name: "Fondos en máquina de tríceps", muscle: "Tríceps" },
-  { id: "fondos-libres-triceps",       name: "Fondos libres de tríceps",     muscle: "Tríceps" },
+  { id: "fondos-libres-triceps",       name: "Fondos libres de tríceps",     muscle: "Tríceps", secondary: ["Pecho", "Hombro"] },
   { id: "press-cerrado-barra",         name: "Press cerrado con barra",      muscle: "Tríceps", secondary: ["Pecho"] },
   { id: "press-frances-mancuernas",    name: "Press francés con mancuernas", muscle: "Tríceps" },
   { id: "press-frances-polea",         name: "Press francés en polea",       muscle: "Tríceps" },
@@ -460,25 +460,25 @@ const EXERCISE_LIBRARY = [
   { id: "crunch-abdomen-polea",        name: "Crunch de abdomen en polea",   muscle: "Abdomen" },
   { id: "crunch-abdomen",              name: "Crunch de abdomen",            muscle: "Abdomen" },
   { id: "dragon-flag-abdomen",         name: "Dragon flags de abdomen",      muscle: "Abdomen" },
-  { id: "plancha-abdominal",           name: "Planchas abdominales",         muscle: "Abdomen" },
+  { id: "plancha-abdominal",           name: "Planchas abdominales",         muscle: "Abdomen", secondary: ["Hombro"] },
   { id: "rodillas-pecho",              name: "Rodillas al pecho",            muscle: "Abdomen" },
   { id: "rotacion-oblicuos-poleas",    name: "Rotación de oblicuos en poleas", muscle: "Abdomen" },
-  { id: "rueda-abdominal",             name: "Rueda abdominal",              muscle: "Abdomen" },
+  { id: "rueda-abdominal",             name: "Rueda abdominal",              muscle: "Abdomen", secondary: ["Hombro", "Espalda"] },
   { id: "crunch-abdomen-maquina",      name: "Crunch de abdomen en máquina", muscle: "Abdomen" },
   { id: "curl-femoral-tumbado",        name: "Curl femoral tumbado",         muscle: "Pierna", sub: "Femoral" },
   { id: "curl-femoral-sentado",        name: "Curl femoral sentado",         muscle: "Pierna", sub: "Femoral" },
-  { id: "hip-thrust",                  name: "Hip thrust",                   muscle: "Pierna", sub: "Glúteo" },
-  { id: "patada-gluteo-polea",         name: "Patada de glúteo en polea",    muscle: "Pierna", sub: "Glúteo" },
-  { id: "peso-muerto-rumano-barra",    name: "Peso muerto rumano con barra", muscle: "Pierna", sub: "Glúteo" },
-  { id: "peso-muerto-rumano-mancuernas", name: "Peso muerto rumano con mancuernas", muscle: "Pierna", sub: "Glúteo" },
-  { id: "aductor-externo-maquina",     name: "Aductor externo en máquina",    muscle: "Pierna", sub: "Cuádriceps" },
+  { id: "hip-thrust",                  name: "Hip thrust",                   muscle: "Pierna", sub: "Glúteo", secondary: ["Femoral"] },
+  { id: "patada-gluteo-polea",         name: "Patada de glúteo en polea",    muscle: "Pierna", sub: "Glúteo", secondary: ["Femoral"] },
+  { id: "peso-muerto-rumano-barra",    name: "Peso muerto rumano con barra", muscle: "Pierna", sub: "Glúteo", secondary: ["Femoral"] },
+  { id: "peso-muerto-rumano-mancuernas", name: "Peso muerto rumano con mancuernas", muscle: "Pierna", sub: "Glúteo", secondary: ["Femoral"] },
+  { id: "aductor-externo-maquina",     name: "Aductor externo en máquina",    muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
   { id: "aductor-interno-maquina",     name: "Aductor interno en máquina",    muscle: "Pierna", sub: "Cuádriceps" },
-  { id: "hack-squat",                  name: "Hack squat",                   muscle: "Pierna", sub: "Cuádriceps" },
-  { id: "prensa-piernas",              name: "Prensa de piernas",            muscle: "Pierna", sub: "Cuádriceps" },
-  { id: "sentadilla-barra",            name: "Sentadilla con barra",         muscle: "Pierna", sub: "Cuádriceps" },
-  { id: "sentadilla-pendular",         name: "Sentadilla pendular",          muscle: "Pierna", sub: "Cuádriceps" },
-  { id: "zancadas-mancuernas",         name: "Zancadas con mancuernas",      muscle: "Pierna", sub: "Cuádriceps" },
-  { id: "zancadas-bulgaras",           name: "Zancadas búlgaras",            muscle: "Pierna", sub: "Cuádriceps" },
+  { id: "hack-squat",                  name: "Hack squat",                   muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
+  { id: "prensa-piernas",              name: "Prensa de piernas",            muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
+  { id: "sentadilla-barra",            name: "Sentadilla con barra",         muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo", "Abdomen"] },
+  { id: "sentadilla-pendular",         name: "Sentadilla pendular",          muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
+  { id: "zancadas-mancuernas",         name: "Zancadas con mancuernas",      muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
+  { id: "zancadas-bulgaras",           name: "Zancadas búlgaras",            muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
   { id: "extension-cuadriceps",        name: "Extensión de cuádriceps",      muscle: "Pierna", sub: "Cuádriceps" },
   { id: "gemelo-sentado",              name: "Extensión de gemelo sentado",  muscle: "Pierna", sub: "Gemelo" },
   { id: "gemelo-de-pie",               name: "Extensión de gemelo de pie",   muscle: "Pierna", sub: "Gemelo" },
@@ -1687,7 +1687,12 @@ function statMatchesQuery(st, q){
       const subSyns = SUB_SYNONYMS[libEx.sub] || [normalizeText(libEx.sub)];
       if(subSyns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s)))) return true;
     }
-    const allMuscles = [libEx.muscle, ...(libEx.secondary||[])];
+    const secondaryList = libEx.secondary || [];
+    if(secondaryList.some(sec => {
+      const subSyns = SUB_SYNONYMS[sec];
+      return subSyns ? subSyns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s))) : false;
+    })) return true;
+    const allMuscles = [libEx.muscle, ...secondaryList];
     if(allMuscles.some(m => {
       const syns = MUSCLE_SYNONYMS[m] || [];
       return syns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s)));
@@ -2348,7 +2353,16 @@ function exerciseMatchesQuery(e, q){
     const subSyns = SUB_SYNONYMS[e.sub] || [normalizeText(e.sub)];
     if(subSyns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s)))) return true;
   }
-  const allMuscles = [e.muscle, ...(e.secondary||[])];
+  const secondaryList = e.secondary || [];
+  // Un secundario puede ser un grupo muscular (p.ej. "Hombro") o, dentro de
+  // Pierna, un subgrupo (p.ej. "Femoral") — se comprueban los sinónimos de
+  // subgrupo primero para que "femoral" encuentre también los ejercicios
+  // que lo tienen como secundario, no solo como principal.
+  if(secondaryList.some(sec => {
+    const subSyns = SUB_SYNONYMS[sec];
+    return subSyns ? subSyns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s))) : false;
+  })) return true;
+  const allMuscles = [e.muscle, ...secondaryList];
   return allMuscles.some(m => {
     const syns = MUSCLE_SYNONYMS[m] || [];
     return syns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s)));
