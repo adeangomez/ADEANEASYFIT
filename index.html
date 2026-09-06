@@ -471,6 +471,15 @@ const EXERCISE_LIBRARY = [
   { id: "patada-gluteo-polea",         name: "Patada de glúteo en polea",    muscle: "Pierna", sub: "Glúteo" },
   { id: "peso-muerto-rumano-barra",    name: "Peso muerto rumano con barra", muscle: "Pierna", sub: "Glúteo" },
   { id: "peso-muerto-rumano-mancuernas", name: "Peso muerto rumano con mancuernas", muscle: "Pierna", sub: "Glúteo" },
+  { id: "aductor-externo-maquina",     name: "Aductor externo en máquina",    muscle: "Pierna", sub: "Cuádriceps" },
+  { id: "aductor-interno-maquina",     name: "Aductor interno en máquina",    muscle: "Pierna", sub: "Cuádriceps" },
+  { id: "hack-squat",                  name: "Hack squat",                   muscle: "Pierna", sub: "Cuádriceps" },
+  { id: "prensa-piernas",              name: "Prensa de piernas",            muscle: "Pierna", sub: "Cuádriceps" },
+  { id: "sentadilla-barra",            name: "Sentadilla con barra",         muscle: "Pierna", sub: "Cuádriceps" },
+  { id: "sentadilla-pendular",         name: "Sentadilla pendular",          muscle: "Pierna", sub: "Cuádriceps" },
+  { id: "zancadas-mancuernas",         name: "Zancadas con mancuernas",      muscle: "Pierna", sub: "Cuádriceps" },
+  { id: "zancadas-bulgaras",           name: "Zancadas búlgaras",            muscle: "Pierna", sub: "Cuádriceps" },
+  { id: "extension-cuadriceps",        name: "Extensión de cuádriceps",      muscle: "Pierna", sub: "Cuádriceps" },
 ];
 function exerciseImgUrl(id){ return ASSETS_BASE + id + ".png"; }
 function findExerciseByName(name){ return EXERCISE_LIBRARY.find(e => e.name === name); }
