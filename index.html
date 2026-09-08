@@ -2783,6 +2783,13 @@ let lastHiddenAt = 0;
 async function refreshFromServerOnResume(){
   if(!currentUser || !authToken) return;
   if(isSavingSession) return;
+  // Si estás en la pestaña Entrenar, es muy probable que tengas kg/reps
+  // escritos sin guardar todavía (típico al volver de descansar entre
+  // series, cambiar de app un momento o que se apague la pantalla). Antes
+  // esto los sobrescribía sin avisar. Ya no hace falta: el guardado en sí
+  // (apiSaveData) comprueba la versión del servidor y avisa si hay datos
+  // más nuevos, así que aquí basta con NO tocar nada mientras entrenas.
+  if(activeTab === "train") return;
   try{
     const fresh = await apiGetData();
     if(fresh){
