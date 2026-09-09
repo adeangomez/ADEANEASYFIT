@@ -271,6 +271,9 @@
   .hist-day{ font-weight:700; font-size:14.5px; color:var(--text); }
   .hist-plan{ color:var(--text-faint); font-weight:600; font-size:11.5px; }
   .hist-del-btn{ background:none; border:none; padding:4px; color:var(--text-faint); cursor:pointer; display:flex; }
+  .hist-edit-btn{ background:none; border:none; padding:4px; color:var(--text-faint); cursor:pointer; display:flex; }
+  .hist-edit-btn:hover{ color:var(--iron); }
+  .hist-edit-btn svg{ width:16px; height:16px; }
   .hist-del-btn:hover{ color:var(--down); }
   .hist-del-btn svg{ width:16px; height:16px; }
   .hist-chevron{ display:flex; color:var(--text-faint); transition:transform .2s; }
@@ -544,6 +547,7 @@ const ICON_HISTORY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 const ICON_CARDIO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>`;
 const ICON_SPARKLE = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.7 5.9 5.9 1.7-5.9 1.7-1.7 5.9-1.7-5.9-5.9-1.7 5.9-1.7z"/></svg>`;
 const ICON_TRASH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a1 1 0 01-1 1H7a1 1 0 01-1-1L5 6"/><line x1="10" y1="10.5" x2="10" y2="17"/><line x1="14" y1="10.5" x2="14" y2="17"/></svg>`;
+const ICON_EDIT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></svg>`;
 const ICON_CHEVRON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,6 15,12 9,18"/></svg>`;
 const ICON_LOCK_INLINE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:inline-block;vertical-align:-2px;margin-right:4px;"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>`;
 const ICON_SCALE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 8h8M12 8v8M8.5 12a3.5 3.5 0 007 0"/></svg>`;
@@ -1487,6 +1491,89 @@ async function selectTrainDay(index){
   }
 }
 
+// =======================================================================
+// BORRADOR DEL ENTRENAMIENTO EN CURSO (localStorage)
+// =======================================================================
+// Los kg/reps que vas escribiendo solo existen en los campos del formulario
+// hasta que guardas — si el móvil mata la pestaña en segundo plano (algo
+// habitual pasados unos minutos sin tocar la pantalla, sobre todo con la
+// pantalla bloqueada), se perdían sin remedio. Para evitarlo, cada cambio
+// se guarda también aquí, en el propio dispositivo, y se recupera al volver
+// —incluso si la app se ha recargado del todo— mientras no haya pasado más
+// de una hora.
+const TRAIN_DRAFT_MAX_AGE_MS = 60 * 60 * 1000; // 1 hora
+function trainDraftKey(){
+  return "adeanfit_draft_" + (currentUser || "anon");
+}
+function saveTrainDraft(day){
+  try{
+    const inputs = document.querySelectorAll("#sessionForm input");
+    const values = {};
+    let hasAny = false;
+    inputs.forEach(inp=>{
+      if(inp.value !== ""){
+        values[inp.dataset.ex + "-" + inp.dataset.set + "-" + inp.dataset.type] = inp.value;
+        hasAny = true;
+      }
+    });
+    if(!hasAny){
+      localStorage.removeItem(trainDraftKey());
+      return;
+    }
+    const draft = {
+      planId: activePlanId || null,
+      dayIndex: state.currentDayIndex,
+      dayName: day.name,
+      savedAt: Date.now(),
+      values
+    };
+    localStorage.setItem(trainDraftKey(), JSON.stringify(draft));
+  }catch(e){ /* si el navegador bloquea localStorage, simplemente no hay borrador */ }
+}
+function readTrainDraft(){
+  try{
+    const raw = localStorage.getItem(trainDraftKey());
+    if(!raw) return null;
+    const draft = JSON.parse(raw);
+    if(!draft || typeof draft !== "object") return null;
+    if(Date.now() - draft.savedAt > TRAIN_DRAFT_MAX_AGE_MS){
+      localStorage.removeItem(trainDraftKey());
+      return null;
+    }
+    return draft;
+  }catch(e){ return null; }
+}
+function clearTrainDraft(){
+  try{ localStorage.removeItem(trainDraftKey()); }catch(e){}
+}
+function restoreTrainDraft(day){
+  const draft = readTrainDraft();
+  if(!draft) return;
+  // Solo se recupera si coincide con la rutina y el día exactos que se
+  // estaban rellenando — si has cambiado de día o de rutina desde entonces,
+  // no tiene sentido rellenar campos de otro sitio.
+  if(draft.planId !== (activePlanId || null) || draft.dayIndex !== state.currentDayIndex) return;
+  let restoredAny = false;
+  Object.entries(draft.values).forEach(([key, value])=>{
+    const [exIdx, setIdx, type] = key.split("-");
+    const input = document.querySelector(`#sessionForm input[data-ex="${exIdx}"][data-set="${setIdx}"][data-type="${type}"]`);
+    if(input){ input.value = value; restoredAny = true; }
+  });
+  if(restoredAny){
+    const banner = document.createElement("div");
+    banner.className = "hint";
+    banner.style.cssText = "text-align:center;margin-bottom:12px;";
+    banner.textContent = "Se han recuperado los datos que estabas metiendo sin guardar.";
+    const form = document.getElementById("sessionForm");
+    if(form) form.insertBefore(banner, form.firstChild);
+  }
+}
+function wireTrainDraftAutosave(day){
+  document.querySelectorAll("#sessionForm input").forEach(input=>{
+    input.addEventListener("input", ()=> saveTrainDraft(day));
+  });
+}
+
 function lastTimeFor(exerciseName){
   for(let i = state.sessions.length - 1; i >= 0; i--){
     const s = state.sessions[i];
@@ -1565,6 +1652,8 @@ function renderTrain(){
   `;
   main.innerHTML = html;
   document.getElementById("sessionForm").addEventListener("submit", onSaveSession);
+  restoreTrainDraft(day);
+  wireTrainDraftAutosave(day);
   startSaveCooldownTimer();
   const reminderBtn = document.getElementById("weightReminderBtn");
   if(reminderBtn) reminderBtn.addEventListener("click", ()=> showUpdateWeightModal());
@@ -1736,6 +1825,7 @@ async function onSaveSession(e){
     state.currentDayIndex = newDayIndex;
     lastSaveAt = Date.now();
     await syncToServer();
+    clearTrainDraft();
 
     // Comprobación de seguridad: releemos del servidor para confirmar que el
     // avance de día realmente se guardó, en vez de asumirlo a ciegas.
@@ -2189,6 +2279,7 @@ function renderHistory(){
           <div class="hist-day">${sess.dayName}${sess.planName ? ` <span class="hist-plan">· ${sess.planName}</span>` : ``}</div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <button class="hist-edit-btn" data-edit="${sess.id}" title="Editar sesión">${ICON_EDIT}</button>
           <button class="hist-del-btn" data-del="${sess.id}" title="Eliminar sesión">${ICON_TRASH}</button>
           <span class="hist-chevron ${isOpen?'open':''}">${ICON_CHEVRON}</span>
         </div>
@@ -2223,6 +2314,70 @@ function renderHistory(){
       e.stopPropagation();
       deleteSession(Number(btn.dataset.del));
     });
+  });
+  main.querySelectorAll("[data-edit]").forEach(btn=>{
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      showEditSessionModal(Number(btn.dataset.edit));
+    });
+  });
+}
+
+function showEditSessionModal(sessionId){
+  const sess = state.sessions.find(s => s.id === sessionId);
+  if(!sess) return;
+
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  let bodyHtml = `
+    <h3>Editar sesión</h3>
+    <div class="modal-sub">${sess.dayName}${sess.planName ? ` · ${sess.planName}` : ``} · ${fmtDateFull(sess.date)}</div>
+    <form id="editSessionForm">
+  `;
+  sess.exercises.forEach((ex, exIdx)=>{
+    bodyHtml += `<div class="exercise-card" style="margin-top:14px;">
+      <div class="exercise-head">
+        <div class="exercise-head-top">
+          <div class="exercise-head-text"><h3>${ex.name}</h3></div>
+        </div>
+      </div>
+      <div class="col-heads"><span>#</span><span>Kg</span><span>Reps</span></div>
+      <div class="sets">`;
+    ex.sets.forEach((s, sIdx)=>{
+      bodyHtml += `<div class="set-row">
+        <div class="lbl">${sIdx+1}</div>
+        <div class="field"><input inputmode="decimal" placeholder="0" data-ex="${exIdx}" data-set="${sIdx}" data-type="kg" value="${s.kg ? s.kg : ""}"><span class="unit">KG</span></div>
+        <div class="field"><input inputmode="numeric" placeholder="0" data-ex="${exIdx}" data-set="${sIdx}" data-type="reps" value="${s.reps ? s.reps : ""}"><span class="unit">REP</span></div>
+      </div>`;
+    });
+    bodyHtml += `</div></div>`;
+  });
+  bodyHtml += `
+      <button type="submit" class="btn-primary" id="editSessionSaveBtn" style="margin-top:16px;">Guardar cambios</button>
+      <button type="button" class="btn-secondary" id="editSessionCancel">Cancelar</button>
+    </form>
+  `;
+  overlay.innerHTML = `<div class="modal-sheet" style="max-height:82vh;overflow-y:auto;">${bodyHtml}</div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeModal(overlay); });
+  document.getElementById("editSessionCancel").addEventListener("click", ()=> closeModal(overlay));
+  document.getElementById("editSessionForm").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const btn = document.getElementById("editSessionSaveBtn");
+    if(btn){ btn.disabled = true; btn.textContent = "Guardando…"; }
+    overlay.querySelectorAll("input").forEach(inp=>{
+      const exIdx = Number(inp.dataset.ex), sIdx = Number(inp.dataset.set), type = inp.dataset.type;
+      const val = parseFloat(String(inp.value).replace(",", "."));
+      sess.exercises[exIdx].sets[sIdx][type] = isNaN(val) ? 0 : val;
+    });
+    try{
+      await syncToServer();
+      closeModal(overlay);
+      render();
+    }catch(err){
+      alert("No se pudieron guardar los cambios: " + err.message);
+      if(btn){ btn.disabled = false; btn.textContent = "Guardar cambios"; }
+    }
   });
 }
 
