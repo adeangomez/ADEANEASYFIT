@@ -2411,10 +2411,21 @@ async function deleteSession(id){
 // RUTINAS: crear, listar, activar, eliminar
 // =======================================================================
 function emptyDraft(){
-  return { name: "", days: [ emptyDraftDay() ] };
+  return { name: "", days: [ emptyDraftDay() ], editingPlanId: null };
 }
 function emptyDraftDay(){
-  return { name: "", exercises: [ { name: "", sets: 3 } ] };
+  return { name: "", sub: "", exercises: [ { name: "", sets: 3 } ] };
+}
+function draftFromPlan(plan){
+  return {
+    name: plan.name,
+    editingPlanId: plan.id,
+    days: plan.days.map(d => ({
+      name: d.name,
+      sub: d.sub || "",
+      exercises: d.exercises.map(e => ({ name: e.name, sets: e.sets }))
+    }))
+  };
 }
 
 function renderPlans(){
@@ -2450,6 +2461,7 @@ function renderPlans(){
       </div>
       <div style="display:flex;gap:8px;margin-top:14px;">
         ${isActive ? `` : `<button class="btn-secondary act-plan-btn" data-id="${p.id}" style="margin-top:0;flex:1;">Activar</button>`}
+        <button class="btn-secondary edit-plan-btn" data-id="${p.id}" style="margin-top:0;flex:1;">Editar</button>
         <button class="btn-secondary del-plan-btn" data-id="${p.id}" style="margin-top:0;flex:1;color:var(--down);border-color:rgba(255,90,90,0.35);">Eliminar</button>
       </div>
     </div>`;
@@ -2466,6 +2478,16 @@ function renderPlans(){
     plansView = "ai";
     renderPlans();
     window.scrollTo({top:0, behavior:"smooth"});
+  });
+  main.querySelectorAll(".edit-plan-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const plan = plans.find(p=>p.id === btn.dataset.id);
+      if(!plan) return;
+      planDraft = draftFromPlan(plan);
+      plansView = "builder";
+      renderPlans();
+      window.scrollTo({top:0, behavior:"smooth"});
+    });
   });
   main.querySelectorAll(".act-plan-btn").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
@@ -2579,9 +2601,10 @@ function renderAiPlanPreview(){
 
 function renderPlanBuilder(){
   const main = document.getElementById("main");
+  const isEditing = !!planDraft.editingPlanId;
   let html = `
     <div class="section-title">
-      <h2>Nueva rutina</h2>
+      <h2>${isEditing ? "Editar rutina" : "Nueva rutina"}</h2>
     </div>
     <div class="exercise-card" style="padding:16px;">
       <div class="field-group" style="margin-bottom:16px;">
@@ -2619,7 +2642,7 @@ function renderPlanBuilder(){
   html += `
     <button type="button" class="btn-secondary" id="addDayBtn" style="border-style:dashed;">+ Añadir día</button>
     <div class="save-bar">
-      <button type="button" class="btn-primary" id="savePlanBtn">Guardar rutina</button>
+      <button type="button" class="btn-primary" id="savePlanBtn">${isEditing ? "Guardar cambios" : "Guardar rutina"}</button>
       <button type="button" class="btn-secondary" id="cancelPlanBtn">Cancelar</button>
     </div>
   `;
@@ -2887,17 +2910,36 @@ async function onSavePlan(){
     }
   }
 
-  const newPlan = {
-    id: newPlanId(),
-    name,
-    createdAt: new Date().toISOString(),
-    days: planDraft.days.map(d => ({
-      name: d.name.trim(),
-      sub: "",
-      exercises: d.exercises.map(e => ({ name: e.name.trim(), sets: e.sets }))
-    }))
-  };
-  plans.push(newPlan);
+  const isEditing = !!planDraft.editingPlanId;
+  const daysOut = planDraft.days.map(d => ({
+    name: d.name.trim(),
+    sub: d.sub || "",
+    exercises: d.exercises.map(e => ({ name: e.name.trim(), sets: e.sets }))
+  }));
+
+  if(isEditing){
+    const idx = plans.findIndex(p => p.id === planDraft.editingPlanId);
+    if(idx === -1){
+      alert("Esta rutina ya no existe.");
+      planDraft = null;
+      plansView = "list";
+      renderPlans();
+      return;
+    }
+    plans[idx] = { ...plans[idx], name, days: daysOut };
+    if(planDraft.editingPlanId === activePlanId){
+      const maxDay = daysOut.length - 1;
+      if(state.currentDayIndex > maxDay) state.currentDayIndex = 0;
+    }
+  }else{
+    const newPlan = {
+      id: newPlanId(),
+      name,
+      createdAt: new Date().toISOString(),
+      days: daysOut
+    };
+    plans.push(newPlan);
+  }
   await syncToServer();
   planDraft = null;
   plansView = "list";
