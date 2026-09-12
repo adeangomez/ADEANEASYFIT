@@ -240,6 +240,7 @@
   .metric{ background: var(--card-2); border-radius:10px; padding:10px 12px; }
   .metric .m-label{ font-size:10px; color:var(--text-faint); text-transform:uppercase; font-weight:800; letter-spacing:0.04em; }
   .metric .m-value{ font-size:19px; font-weight:800; margin-top:3px; font-family:'JetBrains Mono'; }
+  .metric .m-sub{ font-size:11px; color:var(--text-faint); margin-top:2px; }
   .delta{ display:inline-flex; align-items:center; gap:3px; font-size:12px; font-weight:800; margin-top:4px; }
   .delta.up{ color:var(--up); }
   .delta.down{ color:var(--down); }
@@ -537,6 +538,39 @@ const EXERCISE_LIBRARY = [
   { id: "gemelo-de-pie",               name: "Extensión de gemelo de pie",   muscle: "Pierna", sub: "Gemelo" },
 ];
 function exerciseImgUrl(id){ return ASSETS_BASE + id + ".png"; }
+
+// =======================================================================
+// ZONA CARDIO
+// =======================================================================
+// Lista abierta a crecer: añadir un ejercicio nuevo aquí (más su imagen en
+// assets/cardio/{id}.png) es lo único que hace falta — el resto de la
+// pantalla, el guardado y los cómputos semanales/mensuales funcionan para
+// cualquier ejercicio de esta lista automáticamente.
+const CARDIO_LIBRARY = [
+  { id: "bicicleta-estatica",  name: "Bicicleta estática" },
+  { id: "cinta-de-andar",      name: "Cinta de andar" },
+  { id: "eliptica",            name: "Elíptica" },
+  { id: "maquina-de-escaleras", name: "Máquina de escaleras" },
+];
+const CARDIO_ASSETS_BASE = "https://adeangomez.github.io/ADEANEASYFIT/assets/cardio/";
+function cardioImgUrl(id){ return CARDIO_ASSETS_BASE + id + ".png"; }
+
+function cardioSessionsInRange(days){
+  const list = (state.cardioSessions || []);
+  if(days == null) return list.slice();
+  const cutoff = Date.now() - days * 86400000;
+  return list.filter(s => new Date(s.date).getTime() >= cutoff);
+}
+function cardioTotals(sessions){
+  return sessions.reduce((acc, s) => {
+    acc.minutes += (s.minutes || 0);
+    acc.calories += (s.calories || 0);
+    return acc;
+  }, { minutes: 0, calories: 0 });
+}
+function cardioTotalsForExercise(exerciseId, days){
+  return cardioTotals(cardioSessionsInRange(days).filter(s => s.exerciseId === exerciseId));
+}
 function findExerciseByName(name){ return EXERCISE_LIBRARY.find(e => e.name === name); }
 
 // -------------------- ICONOS (SVG en línea, sin emojis) --------------------
@@ -742,6 +776,7 @@ async function apiSaveData(){
       plans = Array.isArray(fresh.plans) ? fresh.plans : plans;
       activePlanId = (fresh.activePlanId && plans.some(p=>p.id===fresh.activePlanId)) ? fresh.activePlanId : activePlanId;
       state = (fresh.state && typeof fresh.state === "object") ? fresh.state : state;
+      if(!Array.isArray(state.cardioSessions)) state.cardioSessions = [];
       userProfile = fresh.profile || userProfile;
       if(typeof fresh._rev === "number") localDataRev = fresh._rev;
       try{ if(currentUser && document.getElementById("main")) render(); }catch(err){}
@@ -771,6 +806,7 @@ async function loadUserData(){
     plans = data.plans;
     activePlanId = data.activePlanId && plans.some(p=>p.id===data.activePlanId) ? data.activePlanId : plans[0].id;
     state = data.state && typeof data.state === "object" ? data.state : { currentDayIndex: 0, sessions: [] };
+    if(!Array.isArray(state.cardioSessions)) state.cardioSessions = [];
   } else {
     const seedPlan = {
       id: "default",
@@ -3146,10 +3182,94 @@ function render(){
 }
 
 function renderCardio(){
-  document.getElementById("main").innerHTML = `<div class="empty">
-    <div class="empty-icon">${ICON_CARDIO}</div>
-    <div><b>Zona Cardio</b><br>Próximamente podrás registrar aquí tus ejercicios cardiovasculares (running, pádel, bici…) desde una librería cerrada, igual que ya haces con el gimnasio.</div>
-  </div>`;
+  const main = document.getElementById("main");
+  const weekTotal = cardioTotals(cardioSessionsInRange(7));
+  const monthTotal = cardioTotals(cardioSessionsInRange(30));
+
+  let html = `
+    <div class="section-title"><h2>Zona Cardio</h2></div>
+    <div class="exercise-card" style="padding:16px;margin-bottom:16px;">
+      <h3 style="margin:0 0 10px;font-size:15px;">Total de toda la zona cardio</h3>
+      <div style="display:flex;gap:10px;">
+        <div class="metric" style="flex:1;">
+          <div class="m-label">Esta semana</div>
+          <div class="m-value">${fmtMinutes(weekTotal.minutes)}</div>
+          <div class="m-sub">${Math.round(weekTotal.calories)} kcal</div>
+        </div>
+        <div class="metric" style="flex:1;">
+          <div class="m-label">Este mes</div>
+          <div class="m-value">${fmtMinutes(monthTotal.minutes)}</div>
+          <div class="m-sub">${Math.round(monthTotal.calories)} kcal</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  CARDIO_LIBRARY.forEach(ex=>{
+    const exWeek = cardioTotalsForExercise(ex.id, 7);
+    html += `<div class="exercise-card">
+      <div class="exercise-head">
+        <div class="exercise-head-top">
+          <img src="${cardioImgUrl(ex.id)}" alt="" class="exercise-thumb" loading="lazy">
+          <div class="exercise-head-text">
+            <h3>${ex.name}</h3>
+            <span class="setcount">Esta semana: ${fmtMinutes(exWeek.minutes)} · ${Math.round(exWeek.calories)} kcal</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;padding:0 2px 14px;">
+        <div class="field-group" style="margin-bottom:0;flex:1;">
+          <label>Tiempo (min)</label>
+          <input inputmode="numeric" placeholder="0" data-cardio-min="${ex.id}">
+        </div>
+        <div class="field-group" style="margin-bottom:0;flex:1;">
+          <label>Calorías</label>
+          <input inputmode="numeric" placeholder="0" data-cardio-cal="${ex.id}">
+        </div>
+      </div>
+      <button type="button" class="btn-secondary cardio-save-btn" data-cardio-save="${ex.id}" style="margin-top:0;">Guardar</button>
+    </div>`;
+  });
+
+  main.innerHTML = html;
+  main.querySelectorAll("[data-cardio-save]").forEach(btn=>{
+    btn.addEventListener("click", ()=> onSaveCardio(btn.dataset.cardioSave));
+  });
+}
+
+function fmtMinutes(totalMin){
+  const m = Math.round(totalMin || 0);
+  if(m < 60) return m + " min";
+  const h = Math.floor(m / 60), rem = m % 60;
+  return h + "h" + (rem ? " " + rem + "min" : "");
+}
+
+async function onSaveCardio(exerciseId){
+  const minInput = document.querySelector(`[data-cardio-min="${exerciseId}"]`);
+  const calInput = document.querySelector(`[data-cardio-cal="${exerciseId}"]`);
+  const minutes = parseFloat(String(minInput.value).replace(",", ".")) || 0;
+  const calories = parseFloat(String(calInput.value).replace(",", ".")) || 0;
+  if(minutes <= 0 && calories <= 0){
+    alert("Introduce al menos el tiempo o las calorías.");
+    return;
+  }
+  const btn = document.querySelector(`[data-cardio-save="${exerciseId}"]`);
+  if(btn){ btn.disabled = true; btn.textContent = "Guardando…"; }
+  try{
+    if(!Array.isArray(state.cardioSessions)) state.cardioSessions = [];
+    state.cardioSessions.push({
+      id: Date.now(),
+      date: new Date().toISOString(),
+      exerciseId,
+      minutes,
+      calories,
+    });
+    await syncToServer();
+    renderCardio();
+  }catch(e){
+    alert("No se pudo guardar: " + e.message);
+    if(btn){ btn.disabled = false; btn.textContent = "Guardar"; }
+  }
 }
 
 // -------------------- RECUPERACIÓN AL VOLVER A LA PESTAÑA --------------------
@@ -3177,6 +3297,7 @@ async function refreshFromServerOnResume(){
       plans = Array.isArray(fresh.plans) ? fresh.plans : plans;
       activePlanId = (fresh.activePlanId && plans.some(p=>p.id===fresh.activePlanId)) ? fresh.activePlanId : activePlanId;
       state = (fresh.state && typeof fresh.state === "object") ? fresh.state : state;
+      if(!Array.isArray(state.cardioSessions)) state.cardioSessions = [];
       userProfile = fresh.profile || userProfile;
       if(document.getElementById("main")) render();
     }
