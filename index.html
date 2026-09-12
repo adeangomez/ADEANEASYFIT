@@ -624,6 +624,31 @@ function daysUntilWeightUpdate(){
 }
 let plansView = "list";    // list | builder
 let planDraft = null;      // { name, days: [{name, exercises:[{name, sets}]}] }
+
+// =======================================================================
+// EDICIÓN "SOLO PARA HOY" EN LA PESTAÑA ENTRENAR
+// =======================================================================
+// Permite cambiar de ejercicio, o añadir/quitar series o ejercicios,
+// SOLO para la sesión que se está entrenando ahora mismo — la rutina
+// guardada (plans[]) nunca se toca. Se guarda en memoria, ligado al
+// plan+día concreto; si cambias de día o recargas la página, vuelve a
+// partir de la rutina original.
+let sessionOverride = null; // { planId, dayIndex, exercises: [{name, sets}] }
+
+function getTrainExercises(day){
+  if(sessionOverride && sessionOverride.planId === (activePlanId||null) && sessionOverride.dayIndex === state.currentDayIndex){
+    return sessionOverride.exercises;
+  }
+  sessionOverride = {
+    planId: activePlanId || null,
+    dayIndex: state.currentDayIndex,
+    exercises: day.exercises.map(e => ({ name: e.name, sets: e.sets }))
+  };
+  return sessionOverride.exercises;
+}
+function clearSessionOverride(){
+  sessionOverride = null;
+}
 let aiGeneratedPlan = null; // plan propuesto por la IA, pendiente de revisar/guardar
 
 let currentUser = null;
@@ -1573,6 +1598,50 @@ function wireTrainDraftAutosave(day){
   });
 }
 
+function wireTodayEditControls(day){
+  document.querySelectorAll(".today-edit-ex-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      getTrainExercises(day); // asegura que el override existe antes de editarlo
+      openExercisePicker(0, Number(btn.dataset.ex), "train");
+    });
+  });
+  document.querySelectorAll(".today-remove-ex-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const exercises = getTrainExercises(day);
+      const exIdx = Number(btn.dataset.ex);
+      if(exercises.length <= 1) return;
+      exercises.splice(exIdx, 1);
+      clearTrainDraft();
+      renderTrain();
+    });
+  });
+  document.querySelectorAll(".today-add-set-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const exercises = getTrainExercises(day);
+      const ex = exercises[Number(btn.dataset.ex)];
+      ex.sets = Math.min(12, ex.sets + 1);
+      clearTrainDraft();
+      renderTrain();
+    });
+  });
+  document.querySelectorAll(".today-remove-set-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const exercises = getTrainExercises(day);
+      const ex = exercises[Number(btn.dataset.ex)];
+      ex.sets = Math.max(1, ex.sets - 1);
+      clearTrainDraft();
+      renderTrain();
+    });
+  });
+  const addBtn = document.getElementById("todayAddExBtn");
+  if(addBtn) addBtn.addEventListener("click", ()=>{
+    const exercises = getTrainExercises(day);
+    exercises.push({ name: "Press banca", sets: 3 });
+    clearTrainDraft();
+    openExercisePicker(0, exercises.length - 1, "train");
+  });
+}
+
 function lastTimeFor(exerciseName){
   for(let i = state.sessions.length - 1; i >= 0; i--){
     const s = state.sessions[i];
@@ -1599,6 +1668,7 @@ function renderTrain(){
   }
   if(state.currentDayIndex >= days.length) state.currentDayIndex = 0;
   const day = days[state.currentDayIndex];
+  const trainExercises = getTrainExercises(day);
   const main = document.getElementById("main");
   let html = "";
   if(canUpdateWeight() && userProfile && userProfile.weightUpdatedAt && !weightReminderDismissed){
@@ -1616,9 +1686,12 @@ function renderTrain(){
       <h2>${day.name}</h2>
       <span class="pill">${day.sub}</span>
     </div>
+    <div class="hint" style="text-align:left;background:var(--card-2);border-radius:10px;padding:9px 12px;margin-bottom:12px;">
+      Puedes ajustar el ejercicio o las series solo para hoy con el lápiz — la rutina guardada no cambia.
+    </div>
     <form id="sessionForm">
   `;
-  day.exercises.forEach((ex, exIdx)=>{
+  trainExercises.forEach((ex, exIdx)=>{
     const last = lastTimeFor(ex.name);
     const libEx = findExerciseByName(ex.name);
     html += `<div class="exercise-card">
@@ -1630,7 +1703,17 @@ function renderTrain(){
             <span class="setcount">${ex.sets} ${ex.sets===1?'serie':'series'}</span>
           </div>
         </div>
-        ${last ? `<div class="last-time">Mejor serie: <b>${last.best} kg x ${last.bestReps}</b></div>` : ``}
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+          <button type="button" class="hist-edit-btn today-edit-ex-btn" data-ex="${exIdx}" title="Cambiar ejercicio solo hoy">${ICON_EDIT}</button>
+          ${trainExercises.length > 1 ? `<button type="button" class="hist-del-btn today-remove-ex-btn" data-ex="${exIdx}" title="Quitar ejercicio solo hoy">${ICON_TRASH}</button>` : ``}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 2px 10px;">
+        ${last ? `<div class="last-time" style="margin:0;">Mejor serie: <b>${last.best} kg x ${last.bestReps}</b></div>` : `<span></span>`}
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button type="button" class="btn-text today-remove-set-btn" data-ex="${exIdx}" style="padding:4px 8px;">− serie</button>
+          <button type="button" class="btn-text today-add-set-btn" data-ex="${exIdx}" style="padding:4px 8px;">+ serie</button>
+        </div>
       </div>`;
     html += `<div class="col-heads"><span>#</span><span>Kg</span><span>Reps</span></div><div class="sets">`;
     for(let s=0; s<ex.sets; s++){
@@ -1643,6 +1726,9 @@ function renderTrain(){
     html += `</div></div>`;
   });
   html += `
+    <button type="button" class="btn-secondary" id="todayAddExBtn" style="border-style:dashed;margin-bottom:16px;">+ Añadir ejercicio solo hoy</button>
+  `;
+  html += `
       <div class="save-bar">
         <button type="submit" class="btn-primary" id="saveSessionBtn">Guardar entrenamiento y pasar al siguiente día</button>
         <div class="hint">Al guardar se registra la sesión de <b>${day.name}</b> y el circuito avanza automáticamente a <b>${days[(state.currentDayIndex+1)%days.length].name}</b>. Puedes tocar cualquier día del carril de arriba para cambiarlo manualmente.</div>
@@ -1653,6 +1739,7 @@ function renderTrain(){
   document.getElementById("sessionForm").addEventListener("submit", onSaveSession);
   restoreTrainDraft(day);
   wireTrainDraftAutosave(day);
+  wireTodayEditControls(day);
   startSaveCooldownTimer();
   const reminderBtn = document.getElementById("weightReminderBtn");
   if(reminderBtn) reminderBtn.addEventListener("click", ()=> showUpdateWeightModal());
@@ -1776,6 +1863,7 @@ async function onSaveSession(e){
   if(isSavingSession) return;
   const days = activeDays();
   const day = days[state.currentDayIndex];
+  const trainExercises = getTrainExercises(day);
   const plan = activePlan();
   const inputs = document.querySelectorAll("#sessionForm input");
   const data = {};
@@ -1804,7 +1892,7 @@ async function onSaveSession(e){
       dayName: day.name,
       planId: plan ? plan.id : null,
       planName: plan ? plan.name : null,
-      exercises: day.exercises.map((ex, exIdx)=>{
+      exercises: trainExercises.map((ex, exIdx)=>{
         const setsData = data[exIdx] || {};
         const sets = [];
         for(let s=0; s<ex.sets; s++){
@@ -1816,7 +1904,7 @@ async function onSaveSession(e){
 
     // Se detectan los récords ANTES de guardar la sesión nueva, comparando
     // contra el historial que había hasta ahora mismo.
-    const newRecords = detectSessionRecords(day, data);
+    const newRecords = detectSessionRecords(trainExercises, data);
     const eligibleForCelebration = hasBeenTrainingLongEnough();
 
     const newDayIndex = (state.currentDayIndex + 1) % days.length;
@@ -1825,6 +1913,7 @@ async function onSaveSession(e){
     lastSaveAt = Date.now();
     await syncToServer();
     clearTrainDraft();
+    clearSessionOverride();
 
     // Comprobación de seguridad: releemos del servidor para confirmar que el
     // avance de día realmente se guardó, en vez de asumirlo a ciegas.
@@ -1854,9 +1943,9 @@ async function onSaveSession(e){
 
 // Compara lo recién introducido (aún sin guardar) contra el historial previo
 // de cada ejercicio del día, y devuelve los que superan su máximo anterior.
-function detectSessionRecords(day, data){
+function detectSessionRecords(exercises, data){
   const records = [];
-  day.exercises.forEach((ex, exIdx)=>{
+  exercises.forEach((ex, exIdx)=>{
     const setsData = data[exIdx] || {};
     let sessionMax = 0, sessionMaxReps = 0;
     Object.values(setsData).forEach(s=>{
@@ -2069,12 +2158,92 @@ function wireProgressViewTabs(){
   });
 }
 
+// =======================================================================
+// EMAIL PERIÓDICO DE PROGRESO
+// =======================================================================
+const PROGRESS_EMAIL_FREQUENCIES = [
+  { value: "weekly", label: "Cada semana" },
+  { value: "biweekly", label: "Cada 2 semanas" },
+  { value: "monthly", label: "Cada mes" },
+  { value: "quarterly", label: "Cada trimestre" },
+  { value: "never", label: "No enviar nunca" },
+];
+function getProgressEmailSettings(){
+  const s = (userProfile && userProfile.progressEmail) || {};
+  return { email: s.email || "", frequency: s.frequency || "never" };
+}
+function progressEmailCardHtml(){
+  const settings = getProgressEmailSettings();
+  const options = PROGRESS_EMAIL_FREQUENCIES.map(f =>
+    `<option value="${f.value}" ${settings.frequency===f.value?"selected":""}>${f.label}</option>`
+  ).join("");
+  return `<div class="exercise-card" style="padding:16px;margin-bottom:14px;">
+    <h3 style="margin:0 0 4px;font-size:15px;">Recibir tu progreso por email</h3>
+    <div class="hint" style="text-align:left;margin-bottom:12px;">Te mandamos un resumen de tu evolución al correo que pongas, con la frecuencia que elijas. Puedes cambiarlo cuando quieras.</div>
+    <div class="field-group" style="margin-bottom:12px;">
+      <label>Correo electrónico</label>
+      <input type="email" id="progressEmailInput" placeholder="tucorreo@ejemplo.com" value="${escapeAttr(settings.email)}">
+    </div>
+    <div class="field-group" style="margin-bottom:12px;">
+      <label>Frecuencia de envío</label>
+      <select id="progressEmailFrequency">${options}</select>
+    </div>
+    <button type="button" class="btn-secondary" id="saveProgressEmailBtn" style="margin-top:0;">Guardar preferencia</button>
+    <div id="progressEmailMsg" class="hint" style="margin-top:8px;"></div>
+  </div>`;
+}
+function wireProgressEmailCard(){
+  const btn = document.getElementById("saveProgressEmailBtn");
+  if(!btn) return;
+  btn.addEventListener("click", async ()=>{
+    const emailInput = document.getElementById("progressEmailInput");
+    const freqSelect = document.getElementById("progressEmailFrequency");
+    const msg = document.getElementById("progressEmailMsg");
+    const email = emailInput.value.trim();
+    const frequency = freqSelect.value;
+    if(frequency !== "never" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      msg.textContent = "Escribe un correo válido.";
+      msg.style.color = "var(--down)";
+      return;
+    }
+    btn.disabled = true;
+    const prevText = btn.textContent;
+    btn.textContent = "Guardando…";
+    try{
+      const prevSettings = getProgressEmailSettings();
+      userProfile = userProfile || {};
+      userProfile.progressEmail = {
+        email,
+        frequency,
+        // Si cambias de correo o reactivas el envío, se reinicia la cuenta
+        // atrás para que no te llegue de golpe algo calculado con el ajuste
+        // anterior.
+        lastSentAt: (prevSettings.email === email && prevSettings.frequency === frequency)
+          ? (userProfile.progressEmail && userProfile.progressEmail.lastSentAt) || null
+          : null
+      };
+      await syncToServer();
+      msg.textContent = frequency === "never" ? "Guardado — no se enviará ningún email." : "Guardado — recibirás tu progreso " + PROGRESS_EMAIL_FREQUENCIES.find(f=>f.value===frequency).label.toLowerCase() + ".";
+      msg.style.color = "var(--steel)";
+    }catch(e){
+      msg.textContent = "No se pudo guardar: " + e.message;
+      msg.style.color = "var(--down)";
+    }finally{
+      btn.disabled = false;
+      btn.textContent = prevText;
+    }
+  });
+}
+
 // -------------------- Sub-vista: progreso de carga (peso levantado por ejercicio) --------------------
 function renderStrengthProgress(){
   const main = document.getElementById("main");
   let html = progressViewTabsHtml();
   html += `
     <div class="section-title"><h2>Progreso</h2></div>
+  `;
+  html += progressEmailCardHtml();
+  html += `
     <div class="filter-row">
       <button data-w="week" class="${progressWindow==='week'?'active':''}">Semanal</button>
       <button data-w="month" class="${progressWindow==='month'?'active':''}">Mensual</button>
@@ -2090,6 +2259,7 @@ function renderStrengthProgress(){
       <div>Todavía no hay sesiones guardadas.<br>Completa tu primer entrenamiento en la pestaña <b>Entrenar</b> para empezar a ver tu evolución.</div></div>`;
     main.innerHTML = html;
     wireProgressViewTabs();
+    wireProgressEmailCard();
     wireAiAnalyzeButton();
     wireProgressSearch();
     return;
@@ -2101,6 +2271,7 @@ function renderStrengthProgress(){
     html += `<div class="empty"><div>Aún no hay datos suficientes para este periodo.</div></div>`;
     main.innerHTML = html;
     wireProgressViewTabs();
+    wireProgressEmailCard();
     wireAiAnalyzeButton();
     wireProgressSearch();
     return;
@@ -2109,6 +2280,7 @@ function renderStrengthProgress(){
     html += `<div class="empty"><div>Ningún ejercicio ni día coincide con "${escapeAttr(progressSearchQuery)}".</div></div>`;
     main.innerHTML = html;
     wireProgressViewTabs();
+    wireProgressEmailCard();
     wireAiAnalyzeButton();
     wireProgressSearch();
     return;
@@ -2141,6 +2313,7 @@ function renderStrengthProgress(){
   });
   main.innerHTML = html;
   wireProgressViewTabs();
+  wireProgressEmailCard();
   wireAiAnalyzeButton();
   wireProgressSearch();
   main.querySelectorAll(".filter-row button[data-w]").forEach(btn=>{
@@ -2165,6 +2338,7 @@ function renderWeightProgress(){
   const main = document.getElementById("main");
   let html = progressViewTabsHtml();
   html += `<div class="section-title"><h2>Peso corporal</h2></div>`;
+  html += progressEmailCardHtml();
 
   const sorted = sortedWeightHistory();
   if(sorted.length === 0){
@@ -2172,6 +2346,7 @@ function renderWeightProgress(){
       <div>Todavía no has registrado ningún peso.<br>Usa el icono de la báscula (junto a tu cuenta, arriba) para introducir tu peso en ayunas y empezar a ver tu evolución.</div></div>`;
     main.innerHTML = html;
     wireProgressViewTabs();
+    wireProgressEmailCard();
     return;
   }
 
@@ -2208,6 +2383,7 @@ function renderWeightProgress(){
 
   main.innerHTML = html;
   wireProgressViewTabs();
+  wireProgressEmailCard();
   main.querySelectorAll("[data-r]").forEach(btn=>{
     btn.addEventListener("click", ()=>{ weightChartRange = btn.dataset.r; renderWeightProgress(); });
   });
@@ -2715,8 +2891,10 @@ function wirePlanBuilderEvents(){
 // =======================================================================
 let pickerTarget = null; // { dayIdx, exIdx }
 
-function openExercisePicker(dayIdx, exIdx){
+let pickerMode = "plan"; // "plan" (editando una rutina) | "train" (solo para hoy)
+function openExercisePicker(dayIdx, exIdx, mode){
   pickerTarget = { dayIdx, exIdx };
+  pickerMode = mode || "plan";
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.id = "exercisePickerOverlay";
@@ -2848,6 +3026,13 @@ function renderExercisePickerGrid(query){
 }
 
 function selectExerciseForSlot(dayIdx, exIdx, exerciseName){
+  if(pickerMode === "train"){
+    sessionOverride.exercises[exIdx].name = exerciseName;
+    clearTrainDraft();
+    closeExercisePicker();
+    renderTrain();
+    return;
+  }
   syncDraftFromDom();
   planDraft.days[dayIdx].exercises[exIdx].name = exerciseName;
   closeExercisePicker();
