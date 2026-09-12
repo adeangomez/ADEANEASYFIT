@@ -214,6 +214,18 @@
       <div class="msg" id="progressMsg"></div>
       <div id="userProgressResult"></div>
     </div>
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 6 10-6"/></svg>Enviar email de progreso de prueba</h2>
+      <div style="font-size:12.5px;color:var(--faint);margin-bottom:14px;">Manda ahora mismo el resumen de progreso de un usuario, sin esperar a que le toque según su frecuencia configurada. Útil para comprobar que todo funciona.</div>
+      <label>Usuario</label>
+      <select id="testEmailUserSelect">
+        <option value="">— Elige un usuario —</option>
+      </select>
+      <label>Enviar a (opcional — si lo dejas en blanco, usa el email que el propio usuario tenga configurado)</label>
+      <input type="email" id="testEmailTo" placeholder="p. ej. adeangomez873@gmail.com">
+      <button id="btnSendTestEmail">Enviar ahora</button>
+      <div class="msg" id="testEmailMsg"></div>
+    </div>
   </div>
 
   <div id="section-dayfix" class="admin-section" style="display:none;">
@@ -223,6 +235,7 @@
       <label>Selecciona un usuario</label>
       <select id="dayFixUserSelect">
         <option value="">— Elige un usuario —</option>
+
       </select>
       <button id="btnLoadDayFix">Cargar</button>
       <div class="msg" id="dayFixLoadMsg"></div>
@@ -547,6 +560,7 @@ async function loadUsers(){
   const listEl = $("userList");
   const selectEl = $("progressUserSelect");
   const dayFixSelectEl = $("dayFixUserSelect");
+  const testEmailSelectEl = $("testEmailUserSelect");
   try{
     const data = await apiCall("/admin/users", { method:"GET" });
     listEl.innerHTML = "";
@@ -555,6 +569,7 @@ async function loadUsers(){
     const prevDayFixSelected = dayFixSelectEl ? dayFixSelectEl.value : "";
     selectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
     if(dayFixSelectEl) dayFixSelectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
+    if(testEmailSelectEl) testEmailSelectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
 
     if(!data.users || data.users.length === 0){
       listEl.innerHTML = '<li style="color:var(--faint);">Todavía no hay usuarios creados.</li>';
@@ -573,6 +588,13 @@ async function loadUsers(){
           opt2.value = username;
           opt2.textContent = suspended ? `${username} (suspendido)` : username;
           dayFixSelectEl.appendChild(opt2);
+        }
+
+        if(testEmailSelectEl){
+          const opt3 = document.createElement("option");
+          opt3.value = username;
+          opt3.textContent = suspended ? `${username} (suspendido)` : username;
+          testEmailSelectEl.appendChild(opt3);
         }
 
         const li = document.createElement("li");
@@ -1026,6 +1048,32 @@ async function loadUserProgressFor(username){
 $("progressUserSelect").addEventListener("change", () => {
   persistIfNeeded();
   loadUserProgressFor($("progressUserSelect").value);
+});
+
+$("btnSendTestEmail").addEventListener("click", async () => {
+  persistIfNeeded();
+  const msg = $("testEmailMsg");
+  const username = $("testEmailUserSelect").value;
+  const to = $("testEmailTo").value.trim();
+  if(!username){
+    showMsg(msg, "Elige un usuario primero.", false);
+    return;
+  }
+  const btn = $("btnSendTestEmail");
+  btn.disabled = true;
+  const prevText = btn.textContent;
+  btn.textContent = "Enviando…";
+  try{
+    const body = { username };
+    if(to) body.to = to;
+    const res = await apiCall("/admin/send-progress-email-test", { method:"POST", body: JSON.stringify(body) });
+    showMsg(msg, `Enviado correctamente a ${res.to}.`, true);
+  }catch(e){
+    showMsg(msg, "No se pudo enviar: " + e.message, false);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = prevText;
+  }
 });
 
 $("btnLoadDayFix").addEventListener("click", async () => {
