@@ -21,3 +21,4 @@ crons = ["0 8 * * *"]
 # guardados de forma cifrada en el Worker (Settings -> Variables and
 # Secrets). Los despliegues por Git los respetan, no hace falta volver
 # a ponerlos — pero conviene comprobarlo después del primer deploy.
+# (forzando redeploy limpio tras confirmar que worker.js ya está en el repo)
