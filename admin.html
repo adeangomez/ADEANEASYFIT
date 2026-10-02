@@ -131,6 +131,33 @@
   .gap-badge.up{ background:rgba(52,197,121,.12); color:var(--up); }
   .gap-badge.down{ background:rgba(242,80,79,.12); color:var(--iron); }
   .chart-empty{ font-size:11px; color:var(--faint); font-style:italic; padding:8px 0; }
+
+  /* -------------------- Rutina clientes / Panel de clientes -------------------- */
+  .big-chart{ width:100%; height:200px; display:block; }
+  .ex-thumb{ width:40px; height:40px; border-radius:9px; background:linear-gradient(135deg,#2a2c33,#1a1b20); background-size:cover; background-position:center; flex-shrink:0; border:1px solid var(--line); }
+  .ex-thumb.lg{ width:72px; height:72px; border-radius:12px; }
+  .plan-card{ background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:13px 14px; margin-bottom:10px; }
+  .plan-card-top{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; }
+  .plan-card-name{ font-weight:700; font-size:14px; }
+  .plan-card-meta{ font-size:10.5px; color:var(--faint); margin-top:2px; }
+  .plan-active-badge{ font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--up); background:rgba(52,197,121,.12); border-radius:100px; padding:3px 8px; flex-shrink:0; }
+  .plan-card-actions{ display:flex; flex-wrap:wrap; gap:6px; }
+  .plan-card-actions button{ width:auto; padding:7px 11px; font-size:10.5px; }
+  .day-card{ background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:12px 13px; margin-bottom:10px; }
+  .day-card-head{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .day-card-head input{ margin-bottom:0; }
+  .ex-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .ex-row select{ margin-bottom:0; flex:1; }
+  .ex-row input{ margin-bottom:0; width:58px; flex-shrink:0; text-align:center; }
+  .ex-row button{ width:auto; padding:8px 10px; font-size:11px; flex-shrink:0; }
+  .icon-btn-row{ display:flex; gap:8px; margin-top:4px; }
+  .icon-btn-row button{ width:auto; flex:1; }
+  .copy-row{ display:flex; gap:8px; align-items:center; margin-top:8px; }
+  .copy-row select{ margin-bottom:0; flex:1; }
+  .copy-row button{ width:auto; flex-shrink:0; padding:9px 12px; font-size:11px; }
+  .exercise-big-card{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+  .exercise-big-card h3{ margin:0 0 3px; font-size:16px; font-family:'Space Grotesk',sans-serif; font-weight:700; }
+  .exercise-big-card .muscle-tag{ font-size:10.5px; color:var(--dim); background:var(--card2); border:1px solid var(--line); border-radius:100px; padding:3px 9px; display:inline-block; }
 </style>
 </head>
 <body>
@@ -163,6 +190,14 @@
     <button data-section="progress">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,17 9,11 13,15 21,6"/><polyline points="15,6 21,6 21,12"/></svg>
       Progreso
+    </button>
+    <button data-section="routines">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+      Rutinas
+    </button>
+    <button data-section="clients">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+      Clientes
     </button>
     <button data-section="dayfix">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -225,6 +260,34 @@
       <input type="email" id="testEmailTo" placeholder="p. ej. adeangomez873@gmail.com">
       <button id="btnSendTestEmail">Enviar ahora</button>
       <div class="msg" id="testEmailMsg"></div>
+    </div>
+  </div>
+
+  <div id="section-routines" class="admin-section" style="display:none;">
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>Rutina de clientes</h2>
+      <label>Selecciona un cliente</label>
+      <select id="routinesUserSelect">
+        <option value="">— Elige un usuario —</option>
+      </select>
+      <div class="msg" id="routinesMsg"></div>
+      <div id="routinesUserBody"></div>
+    </div>
+    <div class="card" id="routineBuilderCard" style="display:none;">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span id="routineBuilderTitleText">Nueva rutina</span></h2>
+      <div id="routineBuilderBody"></div>
+    </div>
+  </div>
+
+  <div id="section-clients" class="admin-section" style="display:none;">
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>Panel de clientes</h2>
+      <label>Selecciona un cliente</label>
+      <select id="clientPanelUserSelect">
+        <option value="">— Elige un usuario —</option>
+      </select>
+      <div class="msg" id="clientPanelMsg"></div>
+      <div id="clientPanelBody"></div>
     </div>
   </div>
 
@@ -348,96 +411,111 @@ document.querySelectorAll("[data-usv]").forEach(btn => {
   });
 });
 
-// -------------------- LIBRERÍA DE EJERCICIOS (igual que en la app) --------------------
+// -------------------- LIBRERÍA DE EJERCICIOS (igual que en la app, con fotos) --------------------
+const ASSETS_BASE = "https://adeangomez.github.io/ADEANEASYFIT/assets/ejercicios/";
 const EXERCISE_LIBRARY = [
-  { name: "Aperturas de pecho en máquina", muscle: "Pecho" },
-  { name: "Aperturas de pecho en poleas", muscle: "Pecho" },
-  { name: "Flexiones", muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
-  { name: "Fondos en máquina", muscle: "Pecho", secondary: ["Tríceps"] },
-  { name: "Fondos en paralelas", muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
-  { name: "Press declinado con barra", muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
-  { name: "Press de pecho en máquina", muscle: "Pecho", secondary: ["Tríceps"] },
-  { name: "Press inclinado en máquina", muscle: "Pecho", secondary: ["Tríceps"] },
-  { name: "Press inclinado con mancuernas", muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
-  { name: "Press inclinado en Smith", muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
-  { name: "Press plano con mancuernas", muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
-  { name: "Press plano en Smith", muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
-  { name: "Pull-over con mancuerna", muscle: "Pecho", secondary: ["Espalda"] },
-  { name: "Press banca", muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
-  { name: "Dominadas", muscle: "Espalda", secondary: ["Bíceps"] },
-  { name: "Encogimientos con mancuernas", muscle: "Espalda" },
-  { name: "Jalón al pecho", muscle: "Espalda", secondary: ["Bíceps"] },
-  { name: "Jalón en máquina", muscle: "Espalda", secondary: ["Bíceps"] },
-  { name: "Peso muerto", muscle: "Espalda", secondary: ["Glúteo", "Femoral"] },
-  { name: "Remo con mancuernas", muscle: "Espalda", secondary: ["Bíceps"] },
-  { name: "Remo con barra", muscle: "Espalda", secondary: ["Bíceps"] },
-  { name: "Remo en máquina", muscle: "Espalda", secondary: ["Bíceps"] },
-  { name: "Remo en T", muscle: "Espalda", secondary: ["Bíceps"] },
-  { name: "Face pull", muscle: "Espalda", secondary: ["Hombro"] },
-  { name: "Extensión lumbar", muscle: "Espalda", secondary: ["Glúteo", "Femoral"] },
-  { name: "Jalón con agarre cerrado supino", muscle: "Espalda", secondary: ["Bíceps"] },
-  { name: "Elevaciones frontales con mancuernas", muscle: "Hombro" },
-  { name: "Pajaritos", muscle: "Hombro", secondary: ["Espalda"] },
-  { name: "Pec deck posterior invertido", muscle: "Hombro", secondary: ["Espalda"] },
-  { name: "Press militar con mancuernas", muscle: "Hombro", secondary: ["Tríceps"] },
-  { name: "Aperturas de hombro en poleas", muscle: "Hombro" },
-  { name: "Aperturas de hombro", muscle: "Hombro" },
-  { name: "Press militar con barra", muscle: "Hombro", secondary: ["Tríceps"] },
-  { name: "Remo vertical", muscle: "Hombro", secondary: ["Espalda"] },
-  { name: "Press militar en máquina", muscle: "Hombro", secondary: ["Tríceps"] },
-  { name: "Apertura de hombro en máquina", muscle: "Hombro" },
-  { name: "Press Arnold", muscle: "Hombro", secondary: ["Tríceps"] },
-  { name: "Curl con barra recta", muscle: "Bíceps" },
-  { name: "Curl con barra Z", muscle: "Bíceps" },
-  { name: "Curl en polea", muscle: "Bíceps" },
-  { name: "Curl concentrado", muscle: "Bíceps" },
-  { name: "Curl martillo", muscle: "Bíceps" },
-  { name: "Curl predicador con barra", muscle: "Bíceps" },
-  { name: "Curl predicador con mancuernas", muscle: "Bíceps" },
-  { name: "Curl predicador en máquina", muscle: "Bíceps" },
-  { name: "Curl con mancuernas alterno", muscle: "Bíceps" },
-  { name: "Curl bayesiano en polea", muscle: "Bíceps" },
-  { name: "Patada de tríceps en polea", muscle: "Tríceps" },
-  { name: "Extensión de tríceps trasnuca", muscle: "Tríceps" },
-  { name: "Patada de tríceps con mancuerna", muscle: "Tríceps" },
-  { name: "Press francés con barra Z", muscle: "Tríceps" },
-  { name: "Press de tríceps en máquina", muscle: "Tríceps" },
-  { name: "Flexión diamante de tríceps", muscle: "Tríceps", secondary: ["Pecho", "Hombro"] },
-  { name: "Fondos en máquina de tríceps", muscle: "Tríceps" },
-  { name: "Fondos libres de tríceps", muscle: "Tríceps", secondary: ["Pecho", "Hombro"] },
-  { name: "Press cerrado con barra", muscle: "Tríceps", secondary: ["Pecho"] },
-  { name: "Press francés con mancuernas", muscle: "Tríceps" },
-  { name: "Press francés en polea", muscle: "Tríceps" },
-  { name: "Extensión de tríceps en polea alta", muscle: "Tríceps" },
-  { name: "Press de tríceps unilateral en polea", muscle: "Tríceps" },
-  { name: "Abdominales con levantamiento de piernas en 90°", muscle: "Abdomen" },
-  { name: "Crunch de abdomen en polea", muscle: "Abdomen" },
-  { name: "Crunch de abdomen", muscle: "Abdomen" },
-  { name: "Dragon flags de abdomen", muscle: "Abdomen" },
-  { name: "Planchas abdominales", muscle: "Abdomen", secondary: ["Hombro"] },
-  { name: "Rodillas al pecho", muscle: "Abdomen" },
-  { name: "Rotación de oblicuos en poleas", muscle: "Abdomen" },
-  { name: "Rueda abdominal", muscle: "Abdomen", secondary: ["Hombro", "Espalda"] },
-  { name: "Crunch de abdomen en máquina", muscle: "Abdomen" },
-  { name: "Curl femoral tumbado", muscle: "Pierna", sub: "Femoral" },
-  { name: "Curl femoral sentado", muscle: "Pierna", sub: "Femoral" },
-  { name: "Hip thrust", muscle: "Pierna", sub: "Glúteo", secondary: ["Femoral"] },
-  { name: "Patada de glúteo en polea", muscle: "Pierna", sub: "Glúteo", secondary: ["Femoral"] },
-  { name: "Peso muerto rumano con barra", muscle: "Pierna", sub: "Glúteo", secondary: ["Femoral"] },
-  { name: "Peso muerto rumano con mancuernas", muscle: "Pierna", sub: "Glúteo", secondary: ["Femoral"] },
-  { name: "Aductor externo en máquina", muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
-  { name: "Aductor interno en máquina", muscle: "Pierna", sub: "Cuádriceps" },
-  { name: "Hack squat", muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
-  { name: "Prensa de piernas", muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
-  { name: "Sentadilla con barra", muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo", "Abdomen"] },
-  { name: "Sentadilla pendular", muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
-  { name: "Zancadas con mancuernas", muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
-  { name: "Zancadas búlgaras", muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
-  { name: "Extensión de cuádriceps", muscle: "Pierna", sub: "Cuádriceps" },
-  { name: "Extensión de gemelo sentado", muscle: "Pierna", sub: "Gemelo" },
-  { name: "Extensión de gemelo de pie", muscle: "Pierna", sub: "Gemelo" },
+  { id: "aperturas-pecho-maquina",     name: "Aperturas de pecho en máquina", muscle: "Pecho" },
+  { id: "aperturas-pecho-poleas",      name: "Aperturas de pecho en poleas",  muscle: "Pecho" },
+  { id: "flexiones",                   name: "Flexiones",                    muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "fondos-maquina",              name: "Fondos en máquina",            muscle: "Pecho", secondary: ["Tríceps"] },
+  { id: "fondos-paralelas",            name: "Fondos en paralelas",          muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "press-declinado-barra",       name: "Press declinado con barra",    muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "press-pecho-maquina",         name: "Press de pecho en máquina",    muscle: "Pecho", secondary: ["Tríceps"] },
+  { id: "press-inclinado-maquina",     name: "Press inclinado en máquina",   muscle: "Pecho", secondary: ["Tríceps"] },
+  { id: "press-inclinado-mancuernas",  name: "Press inclinado con mancuernas", muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "press-inclinado-smith",       name: "Press inclinado en Smith",     muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "press-plano-mancuernas",      name: "Press plano con mancuernas",   muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "press-plano-smith",           name: "Press plano en Smith",         muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "pullover-mancuerna",          name: "Pull-over con mancuerna",      muscle: "Pecho", secondary: ["Espalda"] },
+  { id: "press-banca",                 name: "Press banca",                  muscle: "Pecho", secondary: ["Tríceps", "Hombro"] },
+  { id: "dominadas",                   name: "Dominadas",                    muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "encogimientos-mancuernas",    name: "Encogimientos con mancuernas", muscle: "Espalda" },
+  { id: "jalon-al-pecho",              name: "Jalón al pecho",               muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "jalon-maquina",               name: "Jalón en máquina",             muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "peso-muerto",                 name: "Peso muerto",                  muscle: "Espalda", secondary: ["Glúteo", "Femoral"] },
+  { id: "remo-mancuernas",             name: "Remo con mancuernas",          muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "remo-barra",                  name: "Remo con barra",               muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "remo-maquina",                name: "Remo en máquina",              muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "remo-t",                      name: "Remo en T",                    muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "face-pull",                   name: "Face pull",                    muscle: "Espalda", secondary: ["Hombro"] },
+  { id: "extension-lumbar",            name: "Extensión lumbar",             muscle: "Espalda", secondary: ["Glúteo", "Femoral"] },
+  { id: "jalon-agarre-cerrado-supino", name: "Jalón con agarre cerrado supino", muscle: "Espalda", secondary: ["Bíceps"] },
+  { id: "elevaciones-frontales-mancuernas", name: "Elevaciones frontales con mancuernas", muscle: "Hombro" },
+  { id: "pajaritos",                   name: "Pajaritos",                    muscle: "Hombro", secondary: ["Espalda"] },
+  { id: "pec-deck-posterior-invertido", name: "Pec deck posterior invertido", muscle: "Hombro", secondary: ["Espalda"] },
+  { id: "press-militar-mancuernas",    name: "Press militar con mancuernas", muscle: "Hombro", secondary: ["Tríceps"] },
+  { id: "aperturas-hombro-poleas",     name: "Aperturas de hombro en poleas", muscle: "Hombro" },
+  { id: "aperturas-hombro",            name: "Aperturas de hombro",          muscle: "Hombro" },
+  { id: "press-militar-barra",         name: "Press militar con barra",      muscle: "Hombro", secondary: ["Tríceps"] },
+  { id: "remo-vertical",               name: "Remo vertical",                muscle: "Hombro", secondary: ["Espalda"] },
+  { id: "press-militar-maquina",       name: "Press militar en máquina",     muscle: "Hombro", secondary: ["Tríceps"] },
+  { id: "aperturas-hombro-maquina",    name: "Apertura de hombro en máquina", muscle: "Hombro" },
+  { id: "press-arnold",                name: "Press Arnold",                 muscle: "Hombro", secondary: ["Tríceps"] },
+  { id: "curl-barra-recta",            name: "Curl con barra recta",         muscle: "Bíceps" },
+  { id: "curl-barra-z",                name: "Curl con barra Z",             muscle: "Bíceps" },
+  { id: "curl-polea",                  name: "Curl en polea",                muscle: "Bíceps" },
+  { id: "curl-concentrado",            name: "Curl concentrado",             muscle: "Bíceps" },
+  { id: "curl-martillo",               name: "Curl martillo",                muscle: "Bíceps" },
+  { id: "curl-predicador-barra",       name: "Curl predicador con barra",    muscle: "Bíceps" },
+  { id: "curl-predicador-mancuernas",  name: "Curl predicador con mancuernas", muscle: "Bíceps" },
+  { id: "curl-predicador-maquina",     name: "Curl predicador en máquina",   muscle: "Bíceps" },
+  { id: "curl-mancuernas-alterno",     name: "Curl con mancuernas alterno",  muscle: "Bíceps" },
+  { id: "curl-bayesiano-polea",        name: "Curl bayesiano en polea",      muscle: "Bíceps" },
+  { id: "patada-triceps-polea",        name: "Patada de tríceps en polea",   muscle: "Tríceps" },
+  { id: "extension-triceps-trasnuca",  name: "Extensión de tríceps trasnuca", muscle: "Tríceps" },
+  { id: "patada-triceps-mancuerna",    name: "Patada de tríceps con mancuerna", muscle: "Tríceps" },
+  { id: "press-frances-barra-z",       name: "Press francés con barra Z",    muscle: "Tríceps" },
+  { id: "press-triceps-maquina",       name: "Press de tríceps en máquina",  muscle: "Tríceps" },
+  { id: "flexion-diamante-triceps",    name: "Flexión diamante de tríceps",  muscle: "Tríceps", secondary: ["Pecho", "Hombro"] },
+  { id: "fondos-maquina-triceps",      name: "Fondos en máquina de tríceps", muscle: "Tríceps" },
+  { id: "fondos-libres-triceps",       name: "Fondos libres de tríceps",     muscle: "Tríceps", secondary: ["Pecho", "Hombro"] },
+  { id: "press-cerrado-barra",         name: "Press cerrado con barra",      muscle: "Tríceps", secondary: ["Pecho"] },
+  { id: "press-frances-mancuernas",    name: "Press francés con mancuernas", muscle: "Tríceps" },
+  { id: "press-frances-polea",         name: "Press francés en polea",       muscle: "Tríceps" },
+  { id: "extension-triceps-polea-alta", name: "Extensión de tríceps en polea alta", muscle: "Tríceps" },
+  { id: "press-triceps-unilateral-polea", name: "Press de tríceps unilateral en polea", muscle: "Tríceps" },
+  { id: "elevacion-piernas-90",        name: "Abdominales con levantamiento de piernas en 90°", muscle: "Abdomen" },
+  { id: "crunch-abdomen-polea",        name: "Crunch de abdomen en polea",   muscle: "Abdomen" },
+  { id: "crunch-abdomen",              name: "Crunch de abdomen",            muscle: "Abdomen" },
+  { id: "dragon-flag-abdomen",         name: "Dragon flags de abdomen",      muscle: "Abdomen" },
+  { id: "plancha-abdominal",           name: "Planchas abdominales",         muscle: "Abdomen", secondary: ["Hombro"] },
+  { id: "rodillas-pecho",              name: "Rodillas al pecho",            muscle: "Abdomen" },
+  { id: "rotacion-oblicuos-poleas",    name: "Rotación de oblicuos en poleas", muscle: "Abdomen" },
+  { id: "rueda-abdominal",             name: "Rueda abdominal",              muscle: "Abdomen", secondary: ["Hombro", "Espalda"] },
+  { id: "crunch-abdomen-maquina",      name: "Crunch de abdomen en máquina", muscle: "Abdomen" },
+  { id: "curl-femoral-tumbado",        name: "Curl femoral tumbado",         muscle: "Pierna", sub: "Femoral" },
+  { id: "curl-femoral-sentado",        name: "Curl femoral sentado",         muscle: "Pierna", sub: "Femoral" },
+  { id: "hip-thrust",                  name: "Hip thrust",                   muscle: "Pierna", sub: "Glúteo", secondary: ["Femoral"] },
+  { id: "patada-gluteo-polea",         name: "Patada de glúteo en polea",    muscle: "Pierna", sub: "Glúteo", secondary: ["Femoral"] },
+  { id: "peso-muerto-rumano-barra",    name: "Peso muerto rumano con barra", muscle: "Pierna", sub: "Glúteo", secondary: ["Femoral"] },
+  { id: "peso-muerto-rumano-mancuernas", name: "Peso muerto rumano con mancuernas", muscle: "Pierna", sub: "Glúteo", secondary: ["Femoral"] },
+  { id: "aductor-externo-maquina",     name: "Aductor externo en máquina",    muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
+  { id: "aductor-interno-maquina",     name: "Aductor interno en máquina",    muscle: "Pierna", sub: "Cuádriceps" },
+  { id: "hack-squat",                  name: "Hack squat",                   muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
+  { id: "prensa-piernas",              name: "Prensa de piernas",            muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
+  { id: "sentadilla-barra",            name: "Sentadilla con barra",         muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo", "Abdomen"] },
+  { id: "sentadilla-pendular",         name: "Sentadilla pendular",          muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
+  { id: "zancadas-mancuernas",         name: "Zancadas con mancuernas",      muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
+  { id: "zancadas-bulgaras",           name: "Zancadas búlgaras",            muscle: "Pierna", sub: "Cuádriceps", secondary: ["Glúteo"] },
+  { id: "extension-cuadriceps",        name: "Extensión de cuádriceps",      muscle: "Pierna", sub: "Cuádriceps" },
+  { id: "gemelo-sentado",              name: "Extensión de gemelo sentado",  muscle: "Pierna", sub: "Gemelo" },
+  { id: "gemelo-de-pie",               name: "Extensión de gemelo de pie",   muscle: "Pierna", sub: "Gemelo" },
 ];
+function exerciseImgUrl(id){ return ASSETS_BASE + id + ".png"; }
 function findExerciseByName(name){ return EXERCISE_LIBRARY.find(e => e.name === name); }
+const EXERCISE_LIBRARY_NAMES = EXERCISE_LIBRARY.map(e => e.name);
+const MUSCLE_ORDER = ["Pecho","Espalda","Hombro","Bíceps","Tríceps","Abdomen","Pierna"];
+function exerciseOptionsGroupedHtml(selectedName){
+  return MUSCLE_ORDER.map(m => {
+    const items = EXERCISE_LIBRARY.filter(e => e.muscle === m);
+    if(items.length === 0) return "";
+    const opts = items.map(e => `<option value="${escapeAttrAdmin(e.name)}" ${e.name===selectedName?"selected":""}>${e.sub ? `${e.name} (${e.sub})` : e.name}</option>`).join("");
+    return `<optgroup label="${m}">${opts}</optgroup>`;
+  }).join("");
+}
+function escapeAttrAdmin(s){
+  return String(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
 
 const MUSCLE_SYNONYMS = {
   "Pecho": ["pecho", "pectoral", "pectorales", "pecs", "chest"],
@@ -479,9 +557,11 @@ function exerciseMaxWeight(sets){
 }
 
 // misma gráfica de evolución que en la app principal, con la línea de expectativa
-function buildLineChartSvg(values, expected){
+// cssClass: "mini-chart" (por defecto, tarjetas pequeñas) o "big-chart" (Panel de clientes)
+function buildLineChartSvg(values, expected, emptyMsg, cssClass){
+  cssClass = cssClass || "mini-chart";
   if(!values || values.length < 2){
-    return `<div class="chart-empty">Necesitas al menos 2 sesiones registradas de este ejercicio para ver la gráfica.</div>`;
+    return `<div class="chart-empty">${emptyMsg || "Necesitas al menos 2 sesiones registradas de este ejercicio para ver la gráfica."}</div>`;
   }
   const W = 100, H = 34, padY = 4;
   let max = Math.max(...values);
@@ -507,7 +587,7 @@ function buildLineChartSvg(values, expected){
   }
 
   const svg = `
-    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="mini-chart">
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="${cssClass}">
       <path d="${areaD}" fill="${lineColor}" opacity="0.12" stroke="none"/>
       ${expectedLine}
       <path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>
@@ -555,21 +635,31 @@ $("btnCreate").addEventListener("click", async () => {
 
 $("btnList").addEventListener("click", () => { persistIfNeeded(); loadUsers(); });
 
+let allUsernamesCache = [];
+
 async function loadUsers(){
   const msg = $("listMsg");
   const listEl = $("userList");
   const selectEl = $("progressUserSelect");
   const dayFixSelectEl = $("dayFixUserSelect");
   const testEmailSelectEl = $("testEmailUserSelect");
+  const routinesSelectEl = $("routinesUserSelect");
+  const clientPanelSelectEl = $("clientPanelUserSelect");
   try{
     const data = await apiCall("/admin/users", { method:"GET" });
     listEl.innerHTML = "";
 
     const prevSelected = selectEl.value;
     const prevDayFixSelected = dayFixSelectEl ? dayFixSelectEl.value : "";
+    const prevRoutinesSelected = routinesSelectEl ? routinesSelectEl.value : "";
+    const prevClientPanelSelected = clientPanelSelectEl ? clientPanelSelectEl.value : "";
     selectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
     if(dayFixSelectEl) dayFixSelectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
     if(testEmailSelectEl) testEmailSelectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
+    if(routinesSelectEl) routinesSelectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
+    if(clientPanelSelectEl) clientPanelSelectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
+
+    allUsernamesCache = (data.users || []).map(u => typeof u === "string" ? u : u.username);
 
     if(!data.users || data.users.length === 0){
       listEl.innerHTML = '<li style="color:var(--faint);">Todavía no hay usuarios creados.</li>';
@@ -595,6 +685,20 @@ async function loadUsers(){
           opt3.value = username;
           opt3.textContent = suspended ? `${username} (suspendido)` : username;
           testEmailSelectEl.appendChild(opt3);
+        }
+
+        if(routinesSelectEl){
+          const opt4 = document.createElement("option");
+          opt4.value = username;
+          opt4.textContent = suspended ? `${username} (suspendido)` : username;
+          routinesSelectEl.appendChild(opt4);
+        }
+
+        if(clientPanelSelectEl){
+          const opt5 = document.createElement("option");
+          opt5.value = username;
+          opt5.textContent = suspended ? `${username} (suspendido)` : username;
+          clientPanelSelectEl.appendChild(opt5);
         }
 
         const li = document.createElement("li");
@@ -640,6 +744,8 @@ async function loadUsers(){
       });
       if(prevSelected){ selectEl.value = prevSelected; }
       if(dayFixSelectEl && prevDayFixSelected){ dayFixSelectEl.value = prevDayFixSelected; }
+      if(routinesSelectEl && prevRoutinesSelected){ routinesSelectEl.value = prevRoutinesSelected; }
+      if(clientPanelSelectEl && prevClientPanelSelected){ clientPanelSelectEl.value = prevClientPanelSelected; }
     }
     msg.className = "msg";
   }catch(e){
@@ -1096,6 +1202,395 @@ $("btnLoadDayFix").addEventListener("click", async () => {
     container.innerHTML = "";
   }
 });
+
+// -------------------- RUTINA CLIENTES --------------------
+let routinesCurrentUser = null;
+let routinesCurrentData = null;
+let routineBuilderDraft = null;
+
+$("routinesUserSelect").addEventListener("change", () => {
+  persistIfNeeded();
+  loadRoutinesForUser($("routinesUserSelect").value);
+});
+
+async function loadRoutinesForUser(username){
+  const msg = $("routinesMsg");
+  const body = $("routinesUserBody");
+  $("routineBuilderCard").style.display = "none";
+  routinesCurrentUser = username;
+  routinesCurrentData = null;
+  if(!username){
+    body.innerHTML = "";
+    msg.className = "msg";
+    return;
+  }
+  msg.className = "msg";
+  body.innerHTML = '<div style="color:var(--faint);font-size:13px;margin-top:14px;">Cargando…</div>';
+  try{
+    const data = await apiCall("/admin/user-data", { method:"POST", body: JSON.stringify({ username }) });
+    routinesCurrentData = data;
+    renderRoutinesUserBody();
+  }catch(e){
+    showMsg(msg, "Error: " + e.message, false);
+    body.innerHTML = "";
+  }
+}
+
+function renderRoutinesUserBody(){
+  const body = $("routinesUserBody");
+  const data = routinesCurrentData;
+  const plans = data.plans || [];
+
+  let html = `<div class="icon-btn-row" style="margin-top:14px;">
+    <button class="secondary" id="btnNewRoutine">+ Crear rutina nueva</button>
+    <button id="btnAiRoutine">Generar con IA</button>
+  </div>
+  <div id="aiRoutineForm" style="display:none;margin-top:10px;">
+    <label>Describe la rutina que quieres generar</label>
+    <input type="text" id="aiRoutineBrief" placeholder="p. ej. 3 días, fuerza, enfocado en pecho y espalda">
+    <button id="btnAiRoutineGenerate">Generar</button>
+    <div class="msg" id="aiRoutineMsg"></div>
+  </div>`;
+
+  if(plans.length === 0){
+    html += `<div style="color:var(--faint);font-size:12.5px;margin-top:16px;">Este cliente todavía no tiene ninguna rutina.</div>`;
+  } else {
+    html += `<div style="margin-top:16px;">`;
+    plans.forEach(p => {
+      const isActive = p.id === data.activePlanId;
+      const exCount = (p.days || []).reduce((s,d)=>s+(d.exercises?d.exercises.length:0),0);
+      html += `<div class="plan-card">
+        <div class="plan-card-top">
+          <div>
+            <div class="plan-card-name">${p.name}</div>
+            <div class="plan-card-meta">${p.days.length} día${p.days.length===1?"":"s"} · ${exCount} ejercicio${exCount===1?"":"s"}</div>
+          </div>
+          ${isActive ? `<span class="plan-active-badge">Activa</span>` : ``}
+        </div>
+        <div class="plan-card-actions">
+          <button class="secondary edit-plan-btn" data-plan="${p.id}">Editar</button>
+          ${isActive ? `` : `<button class="secondary activate-plan-btn" data-plan="${p.id}">Activar</button>`}
+          <button class="secondary copy-plan-btn" data-plan="${p.id}">Copiar a cliente…</button>
+          <button class="danger delete-plan-btn" data-plan="${p.id}">Eliminar</button>
+        </div>
+        <div class="copy-row" id="copyRow-${p.id}" style="display:none;">
+          <select id="copyTarget-${p.id}"></select>
+          <button id="copyConfirm-${p.id}">Copiar</button>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  body.innerHTML = html;
+
+  $("btnNewRoutine").addEventListener("click", () => openRoutineBuilder(null));
+  $("btnAiRoutine").addEventListener("click", () => {
+    const f = $("aiRoutineForm");
+    f.style.display = f.style.display === "none" ? "block" : "none";
+  });
+  $("btnAiRoutineGenerate").addEventListener("click", async () => {
+    const msg = $("aiRoutineMsg");
+    const brief = $("aiRoutineBrief").value.trim();
+    if(!brief){ showMsg(msg, "Describe qué tipo de rutina quieres.", false); return; }
+    const btn = $("btnAiRoutineGenerate");
+    btn.disabled = true; btn.textContent = "Generando…";
+    try{
+      const res = await apiCall("/admin/generate-plan-for-user", { method:"POST", body: JSON.stringify({ username: routinesCurrentUser, brief }) });
+      msg.className = "msg";
+      $("aiRoutineForm").style.display = "none";
+      $("aiRoutineBrief").value = "";
+      openRoutineBuilder(null, res.plan);
+    }catch(e){
+      showMsg(msg, "Error: " + e.message, false);
+    } finally {
+      btn.disabled = false; btn.textContent = "Generar";
+    }
+  });
+
+  document.querySelectorAll(".edit-plan-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const plan = plans.find(p => p.id === btn.dataset.plan);
+      if(plan) openRoutineBuilder(plan);
+    });
+  });
+  document.querySelectorAll(".activate-plan-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try{
+        await apiCall("/admin/set-day", { method:"POST", body: JSON.stringify({ username: routinesCurrentUser, dayIndex: 0, planId: btn.dataset.plan }) });
+        await loadRoutinesForUser(routinesCurrentUser);
+      }catch(e){
+        alert("Error al activar: " + e.message);
+        btn.disabled = false;
+      }
+    });
+  });
+  document.querySelectorAll(".delete-plan-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const plan = plans.find(p => p.id === btn.dataset.plan);
+      if(!confirm(`¿Eliminar la rutina "${plan ? plan.name : ""}"? No se puede deshacer.`)) return;
+      try{
+        await apiCall("/admin/delete-plan", { method:"POST", body: JSON.stringify({ username: routinesCurrentUser, planId: btn.dataset.plan }) });
+        await loadRoutinesForUser(routinesCurrentUser);
+      }catch(e){ alert("Error al eliminar: " + e.message); }
+    });
+  });
+  document.querySelectorAll(".copy-plan-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const row = document.getElementById("copyRow-" + btn.dataset.plan);
+      const sel = document.getElementById("copyTarget-" + btn.dataset.plan);
+      if(sel && sel.children.length === 0){
+        sel.innerHTML = '<option value="">— Elige un cliente —</option>' +
+          allUsernamesCache.filter(u => u !== routinesCurrentUser).map(u => `<option value="${u}">${u}</option>`).join("");
+      }
+      row.style.display = row.style.display === "none" ? "flex" : "none";
+    });
+  });
+  document.querySelectorAll('[id^="copyConfirm-"]').forEach(btn => {
+    const planId = btn.id.replace("copyConfirm-", "");
+    btn.addEventListener("click", async () => {
+      const sel = document.getElementById("copyTarget-" + planId);
+      const toUsername = sel.value;
+      if(!toUsername){ alert("Elige un cliente de destino."); return; }
+      btn.disabled = true; btn.textContent = "Copiando…";
+      try{
+        await apiCall("/admin/copy-plan", { method:"POST", body: JSON.stringify({ fromUsername: routinesCurrentUser, toUsername, planId }) });
+        alert("Rutina copiada correctamente a " + toUsername + ".");
+        document.getElementById("copyRow-" + planId).style.display = "none";
+      }catch(e){
+        alert("Error al copiar: " + e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = "Copiar";
+      }
+    });
+  });
+}
+
+function openRoutineBuilder(existingPlan, prefillPlan){
+  if(existingPlan){
+    routineBuilderDraft = {
+      id: existingPlan.id,
+      name: existingPlan.name,
+      days: existingPlan.days.map(day => ({ name: day.name, sub: day.sub || "", exercises: day.exercises.map(e => ({ name: e.name, sets: e.sets })) })),
+      activate: existingPlan.id === routinesCurrentData.activePlanId
+    };
+    $("routineBuilderTitleText").textContent = "Editar rutina";
+  } else if(prefillPlan){
+    routineBuilderDraft = {
+      id: null,
+      name: prefillPlan.name,
+      days: prefillPlan.days.map(day => ({ name: day.name, sub: day.sub || "", exercises: day.exercises.map(e => ({ name: e.name, sets: e.sets })) })),
+      activate: false
+    };
+    $("routineBuilderTitleText").textContent = "Rutina generada con IA — revísala antes de guardar";
+  } else {
+    routineBuilderDraft = { id: null, name: "Nueva rutina", days: [{ name: "Día 1", sub: "", exercises: [] }], activate: false };
+    $("routineBuilderTitleText").textContent = "Nueva rutina";
+  }
+  $("routineBuilderCard").style.display = "block";
+  renderRoutineBuilder();
+  if(typeof $("routineBuilderCard").scrollIntoView === "function"){
+    $("routineBuilderCard").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function syncBuilderFromDom(){
+  const nameInput = $("routineNameInput");
+  if(nameInput) routineBuilderDraft.name = nameInput.value;
+  document.querySelectorAll("#routineBuilderBody .day-card").forEach(dayEl => {
+    const dIdx = Number(dayEl.dataset.day);
+    const day = routineBuilderDraft.days[dIdx];
+    if(!day) return;
+    const nameInput2 = dayEl.querySelector(".day-name-input");
+    if(nameInput2) day.name = nameInput2.value;
+    dayEl.querySelectorAll(".ex-row").forEach(exEl => {
+      const eIdx = Number(exEl.dataset.ex);
+      const ex = day.exercises[eIdx];
+      if(!ex) return;
+      const sel = exEl.querySelector("select");
+      const setsInput = exEl.querySelector("input");
+      if(sel) ex.name = sel.value;
+      if(setsInput) ex.sets = Math.max(1, Math.min(12, parseInt(setsInput.value, 10) || 3));
+    });
+  });
+  const activateCheck = $("routineActivateCheck");
+  if(activateCheck) routineBuilderDraft.activate = activateCheck.checked;
+}
+
+function renderRoutineBuilder(){
+  const body = $("routineBuilderBody");
+  const d = routineBuilderDraft;
+
+  let html = `<label>Nombre de la rutina</label>
+    <input type="text" id="routineNameInput" value="${escapeAttrAdmin(d.name)}">`;
+
+  d.days.forEach((day, dIdx) => {
+    html += `<div class="day-card" data-day="${dIdx}">
+      <div class="day-card-head">
+        <input type="text" class="day-name-input" value="${escapeAttrAdmin(day.name)}" placeholder="Nombre del día">
+        <button class="danger remove-day-btn" data-day="${dIdx}" style="width:auto;padding:8px 10px;">✕</button>
+      </div>`;
+    day.exercises.forEach((ex, eIdx) => {
+      html += `<div class="ex-row" data-day="${dIdx}" data-ex="${eIdx}">
+        <select>${exerciseOptionsGroupedHtml(ex.name)}</select>
+        <input type="number" min="1" max="12" value="${ex.sets}">
+        <button class="danger remove-ex-btn" data-day="${dIdx}" data-ex="${eIdx}">✕</button>
+      </div>`;
+    });
+    html += `<button class="secondary add-ex-btn" data-day="${dIdx}" style="margin-top:2px;">+ Añadir ejercicio</button>
+    </div>`;
+  });
+
+  html += `<button class="secondary" id="btnAddDay" style="margin-bottom:14px;">+ Añadir día</button>
+    <div class="remember"><input type="checkbox" id="routineActivateCheck" ${d.activate ? "checked" : ""}> Activar esta rutina para el cliente ahora</div>
+    <div class="icon-btn-row">
+      <button class="secondary" id="btnCancelRoutine">Cancelar</button>
+      <button id="btnSaveRoutine">Guardar rutina</button>
+    </div>
+    <div class="msg" id="routineBuilderMsg"></div>`;
+
+  body.innerHTML = html;
+
+  document.querySelectorAll(".remove-day-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      syncBuilderFromDom();
+      d.days.splice(Number(btn.dataset.day), 1);
+      renderRoutineBuilder();
+    });
+  });
+  document.querySelectorAll(".add-ex-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      syncBuilderFromDom();
+      d.days[Number(btn.dataset.day)].exercises.push({ name: EXERCISE_LIBRARY[0].name, sets: 3 });
+      renderRoutineBuilder();
+    });
+  });
+  document.querySelectorAll(".remove-ex-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      syncBuilderFromDom();
+      d.days[Number(btn.dataset.day)].exercises.splice(Number(btn.dataset.ex), 1);
+      renderRoutineBuilder();
+    });
+  });
+  $("btnAddDay").addEventListener("click", () => {
+    syncBuilderFromDom();
+    d.days.push({ name: "Día " + (d.days.length + 1), sub: "", exercises: [] });
+    renderRoutineBuilder();
+  });
+  $("btnCancelRoutine").addEventListener("click", () => {
+    $("routineBuilderCard").style.display = "none";
+  });
+  $("btnSaveRoutine").addEventListener("click", saveRoutineBuilder);
+}
+
+async function saveRoutineBuilder(){
+  syncBuilderFromDom();
+  const msg = $("routineBuilderMsg");
+  const d = routineBuilderDraft;
+  if(!d.name.trim()){ showMsg(msg, "Ponle un nombre a la rutina.", false); return; }
+  if(d.days.length === 0 || d.days.every(day => day.exercises.length === 0)){
+    showMsg(msg, "Añade al menos un ejercicio.", false);
+    return;
+  }
+  const btn = $("btnSaveRoutine");
+  btn.disabled = true; btn.textContent = "Guardando…";
+  try{
+    const plan = { name: d.name.trim(), days: d.days };
+    if(d.id) plan.id = d.id;
+    await apiCall("/admin/save-plan", { method:"POST", body: JSON.stringify({ username: routinesCurrentUser, plan, activate: !!d.activate }) });
+    showMsg(msg, "Rutina guardada correctamente.", true);
+    $("routineBuilderCard").style.display = "none";
+    await loadRoutinesForUser(routinesCurrentUser);
+  }catch(e){
+    showMsg(msg, "Error: " + e.message, false);
+  } finally {
+    btn.disabled = false; btn.textContent = "Guardar rutina";
+  }
+}
+
+// -------------------- PANEL DE CLIENTES --------------------
+let clientPanelData = null;
+let clientPanelExercise = null;
+
+$("clientPanelUserSelect").addEventListener("change", () => {
+  persistIfNeeded();
+  loadClientPanelFor($("clientPanelUserSelect").value);
+});
+
+async function loadClientPanelFor(username){
+  const msg = $("clientPanelMsg");
+  const body = $("clientPanelBody");
+  if(!username){
+    body.innerHTML = "";
+    msg.className = "msg";
+    return;
+  }
+  msg.className = "msg";
+  body.innerHTML = '<div style="color:var(--faint);font-size:13px;margin-top:14px;">Cargando…</div>';
+  try{
+    const data = await apiCall("/admin/user-data", { method:"POST", body: JSON.stringify({ username }) });
+    clientPanelData = data;
+    clientPanelExercise = null;
+    renderClientPanel();
+  }catch(e){
+    showMsg(msg, "Error: " + e.message, false);
+    body.innerHTML = "";
+  }
+}
+
+function renderClientPanel(){
+  const body = $("clientPanelBody");
+  const data = clientPanelData;
+  const sessions = (data.state && data.state.sessions) || [];
+  const exerciseNames = [...new Set(sessions.flatMap(s => s.exercises.map(e => e.name)))];
+
+  if(exerciseNames.length === 0){
+    body.innerHTML = `<div style="color:var(--faint);font-size:12.5px;margin-top:16px;">Este cliente todavía no tiene ejercicios registrados.</div>`;
+    return;
+  }
+  if(!clientPanelExercise || !exerciseNames.includes(clientPanelExercise)){
+    clientPanelExercise = exerciseNames[0];
+  }
+
+  body.innerHTML = `<label style="margin-top:14px;">Ejercicio</label>
+    <select id="clientPanelExerciseSelect">${exerciseNames.map(n => `<option value="${escapeAttrAdmin(n)}" ${n===clientPanelExercise?"selected":""}>${n}</option>`).join("")}</select>
+    <div id="clientPanelExerciseBody"></div>`;
+
+  $("clientPanelExerciseSelect").addEventListener("change", (e) => {
+    clientPanelExercise = e.target.value;
+    renderClientPanelExercise();
+  });
+
+  renderClientPanelExercise();
+}
+
+function renderClientPanelExercise(){
+  const exBody = $("clientPanelExerciseBody");
+  const data = clientPanelData;
+  const sessions = (data.state && data.state.sessions) || [];
+  const name = clientPanelExercise;
+  const lib = findExerciseByName(name);
+  const dayNames = getExerciseDayNames(sessions, name);
+  const series = buildExerciseTimeSeriesAdmin(sessions, name);
+  const expected = computeExpectedMax(data.profile, name);
+
+  const muscleLabel = lib ? (lib.sub ? `${lib.muscle} — ${lib.sub}` : lib.muscle) : "";
+  const imgUrl = lib ? exerciseImgUrl(lib.id) : "";
+
+  let html = `<div class="exercise-big-card">
+    <div class="ex-thumb lg" ${imgUrl ? `style="background-image:url('${imgUrl}')"` : ""}></div>
+    <div>
+      <h3>${name}</h3>
+      ${muscleLabel ? `<span class="muscle-tag">${muscleLabel}</span>` : ""}
+    </div>
+  </div>`;
+  if(dayNames.length){
+    html += `<div class="stat-day-tags">${dayNames.map(d => `<span class="stat-day-tag">${d}</span>`).join("")}</div>`;
+  }
+  html += buildLineChartSvg(series, expected, "Necesitas al menos 2 sesiones registradas de este ejercicio para ver la gráfica.", "big-chart");
+  exBody.innerHTML = html;
+}
 
 // -------------------- SUGERENCIAS DE EJERCICIOS --------------------
 async function loadSuggestions(){
