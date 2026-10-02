@@ -1,0 +1,23 @@
+name = "adeanfit-api"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# KV donde viven los usuarios, rutinas, sesiones y sugerencias
+# (mismo namespace "adeanfit-kv" que ya tenías enlazado a mano)
+[[kv_namespaces]]
+binding = "ADEANFIT_KV"
+id = "91f4a7e8f5ec480baeb5b7124bab7c3e"
+
+# Workers AI, usado para generar rutinas y analizar progreso
+[ai]
+binding = "AI"
+
+# Envío diario automático de emails de progreso (comprueba cada día a
+# las 08:00 UTC a quién le toca según su frecuencia configurada)
+[triggers]
+crons = ["0 8 * * *"]
+
+# ADMIN_KEY y RESEND_API_KEY NO van aquí: son secretos y ya están
+# guardados de forma cifrada en el Worker (Settings -> Variables and
+# Secrets). Los despliegues por Git los respetan, no hace falta volver
+# a ponerlos — pero conviene comprobarlo después del primer deploy.
