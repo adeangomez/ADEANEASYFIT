@@ -1051,6 +1051,37 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       }
     }
 
+    // ---------------------------------------------------------------
+    // ADMIN: enviar por email el informe completo de un día de rutina de un
+    // cliente (desde el Panel de clientes)  (POST /admin/send-day-chart-email)
+    // Header: X-Admin-Key   Body: { "username", "dayName", "to", "comment"? }
+    // ---------------------------------------------------------------
+    if (path === "/admin/send-day-chart-email" && request.method === "POST") {
+      const adminKey = request.headers.get("X-Admin-Key") || "";
+      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+
+      const body = await request.json().catch(() => ({}));
+      const username = normalizeUsername(body.username);
+      const dayName = String(body.dayName || "").trim();
+      const to = String(body.to || "").trim();
+      const comment = String(body.comment || "").trim();
+      if (!username) return err("Usuario inválido.");
+      if (!dayName) return err("Falta el día de rutina.");
+      if (!to) return err("Indica a qué email quieres enviarlo.");
+
+      const dataRaw = await env.ADEANFIT_KV.get("data:" + username);
+      if (!dataRaw) return err("Ese usuario no existe o no tiene datos.", 404);
+      const data = JSON.parse(dataRaw);
+
+      try {
+        const html = buildDayReportEmailHtml(username, data, dayName, comment);
+        await sendEmailViaResend(env, to, `Informe de entrenamiento — ${dayName} (${username})`, html);
+        return json({ ok: true, to });
+      } catch (e) {
+        return err("No se pudo enviar: " + e.message, 502);
+      }
+    }
+
     return err("Ruta no encontrada.", 404);
   },
 
@@ -1143,13 +1174,98 @@ const STRENGTH_STANDARDS = {
   "Press militar con barra": { "0-3":0.35, "3-6":0.45, "6-12":0.55, "1-2a":0.70, "+2a":0.85 },
   "Remo con barra":          { "0-3":0.45, "3-6":0.60, "6-12":0.75, "1-2a":0.95, "+2a":1.15 },
 };
+// Cada ejercicio de la biblioteca se asocia al básico de STRENGTH_STANDARDS
+// biomecánicamente más parecido, con un coeficiente de ajuste (estimación
+// orientativa, no un estándar certificado por ejercicio). Idéntico al mapa
+// de index.html / admin.html, para que la expectativa sea igual en toda la app.
+const EXERCISE_EXPECTED_MAP = {
+  "Aperturas de pecho en máquina": { table:"Press banca", coef:0.30 },
+  "Aperturas de pecho en poleas": { table:"Press banca", coef:0.30 },
+  "Flexiones": { table:"Press banca", coef:0.50 },
+  "Fondos en máquina": { table:"Press banca", coef:0.90 },
+  "Fondos en paralelas": { table:"Press banca", coef:0.60 },
+  "Press declinado con barra": { table:"Press banca", coef:0.95 },
+  "Press de pecho en máquina": { table:"Press banca", coef:0.90 },
+  "Press inclinado en máquina": { table:"Press banca", coef:0.85 },
+  "Press inclinado con mancuernas": { table:"Press banca", coef:0.80 },
+  "Press inclinado en Smith": { table:"Press banca", coef:0.85 },
+  "Press plano con mancuernas": { table:"Press banca", coef:0.85 },
+  "Press plano en Smith": { table:"Press banca", coef:0.95 },
+  "Pull-over con mancuerna": { table:"Press banca", coef:0.40 },
+  "Press banca": { table:"Press banca", coef:1.00 },
+  "Dominadas": { table:"Remo con barra", coef:0.50 },
+  "Encogimientos con mancuernas": { table:"Remo con barra", coef:1.30 },
+  "Jalón al pecho": { table:"Remo con barra", coef:0.90 },
+  "Jalón en máquina": { table:"Remo con barra", coef:0.90 },
+  "Peso muerto": { table:"Peso muerto", coef:1.00 },
+  "Remo con mancuernas": { table:"Remo con barra", coef:0.85 },
+  "Remo con barra": { table:"Remo con barra", coef:1.00 },
+  "Remo en máquina": { table:"Remo con barra", coef:0.95 },
+  "Remo en T": { table:"Remo con barra", coef:1.00 },
+  "Face pull": { table:"Remo con barra", coef:0.25 },
+  "Extensión lumbar": { table:"Remo con barra", coef:0.30 },
+  "Jalón con agarre cerrado supino": { table:"Remo con barra", coef:0.90 },
+  "Elevaciones frontales con mancuernas": { table:"Press militar con barra", coef:0.25 },
+  "Pajaritos": { table:"Press militar con barra", coef:0.20 },
+  "Pec deck posterior invertido": { table:"Press militar con barra", coef:0.30 },
+  "Press militar con mancuernas": { table:"Press militar con barra", coef:0.80 },
+  "Aperturas de hombro en poleas": { table:"Press militar con barra", coef:0.20 },
+  "Aperturas de hombro": { table:"Press militar con barra", coef:0.20 },
+  "Press militar con barra": { table:"Press militar con barra", coef:1.00 },
+  "Remo vertical": { table:"Press militar con barra", coef:0.60 },
+  "Press militar en máquina": { table:"Press militar con barra", coef:0.90 },
+  "Apertura de hombro en máquina": { table:"Press militar con barra", coef:0.30 },
+  "Press Arnold": { table:"Press militar con barra", coef:0.75 },
+  "Curl con barra recta": { table:"Remo con barra", coef:0.35 },
+  "Curl con barra Z": { table:"Remo con barra", coef:0.35 },
+  "Curl en polea": { table:"Remo con barra", coef:0.32 },
+  "Curl concentrado": { table:"Remo con barra", coef:0.18 },
+  "Curl martillo": { table:"Remo con barra", coef:0.32 },
+  "Curl predicador con barra": { table:"Remo con barra", coef:0.28 },
+  "Curl predicador con mancuernas": { table:"Remo con barra", coef:0.26 },
+  "Curl predicador en máquina": { table:"Remo con barra", coef:0.30 },
+  "Curl con mancuernas alterno": { table:"Remo con barra", coef:0.28 },
+  "Curl bayesiano en polea": { table:"Remo con barra", coef:0.20 },
+  "Patada de tríceps en polea": { table:"Press banca", coef:0.15 },
+  "Extensión de tríceps trasnuca": { table:"Press banca", coef:0.30 },
+  "Patada de tríceps con mancuerna": { table:"Press banca", coef:0.15 },
+  "Press francés con barra Z": { table:"Press banca", coef:0.30 },
+  "Press de tríceps en máquina": { table:"Press banca", coef:0.35 },
+  "Flexión diamante de tríceps": { table:"Press banca", coef:0.40 },
+  "Fondos en máquina de tríceps": { table:"Press banca", coef:0.35 },
+  "Fondos libres de tríceps": { table:"Press banca", coef:0.40 },
+  "Press cerrado con barra": { table:"Press banca", coef:0.85 },
+  "Press francés con mancuernas": { table:"Press banca", coef:0.28 },
+  "Press francés en polea": { table:"Press banca", coef:0.28 },
+  "Extensión de tríceps en polea alta": { table:"Press banca", coef:0.30 },
+  "Press de tríceps unilateral en polea": { table:"Press banca", coef:0.15 },
+  "Curl femoral tumbado": { table:"Peso muerto", coef:0.35 },
+  "Curl femoral sentado": { table:"Peso muerto", coef:0.35 },
+  "Hip thrust": { table:"Peso muerto", coef:1.30 },
+  "Patada de glúteo en polea": { table:"Peso muerto", coef:0.15 },
+  "Peso muerto rumano con barra": { table:"Peso muerto", coef:0.80 },
+  "Peso muerto rumano con mancuernas": { table:"Peso muerto", coef:0.70 },
+  "Aductor externo en máquina": { table:"Peso muerto", coef:0.40 },
+  "Aductor interno en máquina": { table:"Peso muerto", coef:0.40 },
+  "Hack squat": { table:"Peso muerto", coef:1.10 },
+  "Prensa de piernas": { table:"Peso muerto", coef:2.00 },
+  "Sentadilla con barra": { table:"Peso muerto", coef:0.90 },
+  "Sentadilla pendular": { table:"Peso muerto", coef:1.10 },
+  "Zancadas con mancuernas": { table:"Peso muerto", coef:0.40 },
+  "Zancadas búlgaras": { table:"Peso muerto", coef:0.35 },
+  "Extensión de cuádriceps": { table:"Peso muerto", coef:0.50 },
+  "Extensión de gemelo sentado": { table:"Peso muerto", coef:0.70 },
+  "Extensión de gemelo de pie": { table:"Peso muerto", coef:0.70 },
+};
 function computeExpectedMaxEmail(profile, exerciseName) {
   if (!profile || !profile.weightKg || !profile.timeTraining) return null;
-  const table = STRENGTH_STANDARDS[exerciseName];
+  const map = EXERCISE_EXPECTED_MAP[exerciseName];
+  if (!map) return null;
+  const table = STRENGTH_STANDARDS[map.table];
   if (!table) return null;
   const mult = table[profile.timeTraining];
   if (!mult) return null;
-  return Math.round(profile.weightKg * mult * 2) / 2;
+  return Math.round(profile.weightKg * mult * map.coef * 2) / 2;
 }
 
 function arrowFor(diff) {
@@ -1234,6 +1350,146 @@ function exerciseChartImgTag(name, points, expected) {
   };
   const url = quickChartUrl(config, 500, 220);
   return `<img src="${url}" width="500" height="220" alt="Gráfica de ${escapeHtmlEmail(name)}" style="width:100%;max-width:500px;border-radius:8px;margin:10px 0 4px;">`;
+}
+
+function shortDMYEmail(iso) {
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
+// Gráfico de barras pareadas (Esperado en gris, Real en verde si cumple/supera
+// el objetivo u naranja si se queda corto) — una pareja de barras por serie.
+function dayBarChartImgTag(setRows) {
+  const withExpected = setRows.filter(r => r.expected != null);
+  if (withExpected.length === 0) return "";
+  const labels = setRows.map(r => `${r.shortName} S${r.setNum}`);
+  const realColors = setRows.map(r => r.expected == null ? "#5b8def" : (r.kg >= r.expected ? "#34c579" : "#ff5a2e"));
+  const config = {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        { label: "Sombra esperada", data: setRows.map(r => r.expected), backgroundColor: "rgba(170,170,170,0.35)" },
+        { label: "Carga real", data: setRows.map(r => r.kg), backgroundColor: realColors },
+      ],
+    },
+    options: {
+      plugins: { legend: { display: true, labels: { color: "#ccc" } } },
+      scales: {
+        x: { ticks: { color: "#ccc", font: { size: 9 } }, grid: { display: false } },
+        y: { ticks: { color: "#ccc" }, grid: { color: "#2a2a2c" } },
+      },
+    },
+  };
+  const url = quickChartUrl(config, 600, 260);
+  return `<img src="${url}" width="600" height="260" alt="Comparativa de carga real vs. esperada" style="width:100%;max-width:600px;border-radius:8px;margin:10px 0 16px;">`;
+}
+
+// Informe completo de UNA sesión (un día de rutina) — misma estructura que el
+// informe de referencia: KPIs, gráfico de barras esperado vs. real por serie,
+// tabla de desglose completo, y comentario opcional del entrenador. Usa la
+// sesión más reciente registrada para ese día de rutina.
+function buildDayReportEmailHtml(username, data, dayName, comment) {
+  const profile = data.profile || {};
+  const sessions = (data.state && data.state.sessions) || [];
+  const daySessions = sessions.filter(s => s.dayName === dayName).sort((a, b) => new Date(b.date) - new Date(a.date));
+  if (daySessions.length === 0) {
+    return `
+    <div style="font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;background:#0f0f10;padding:28px 24px;border-radius:14px;color:#f2f2f2;">
+      <h1 style="font-size:20px;margin:0 0 4px;color:#ff7a3d;">ADEANEASYFIT</h1>
+      <p style="margin:0 0 20px;font-size:13px;color:#999;">Informe de ${escapeHtmlEmail(dayName)} — ${escapeHtmlEmail(username)}</p>
+      <p style="font-size:14px;color:#bbb;">Todavía no hay ninguna sesión registrada para "${escapeHtmlEmail(dayName)}".</p>
+    </div>`;
+  }
+  const session = daySessions[0];
+
+  const setRows = [];
+  (session.exercises || []).forEach(ex => {
+    const expected = computeExpectedMaxEmail(profile, ex.name);
+    const shortName = ex.name.length > 22 ? ex.name.slice(0, 20) + "…" : ex.name;
+    (ex.sets || []).forEach((st, i) => {
+      if ((st.kg || 0) <= 0 && (st.reps || 0) <= 0) return;
+      setRows.push({ exerciseName: ex.name, shortName, setNum: i + 1, reps: st.reps || 0, kg: st.kg || 0, expected });
+    });
+  });
+
+  const totalVolume = setRows.reduce((sum, r) => sum + r.kg * r.reps, 0);
+  const withExpected = setRows.filter(r => r.expected != null);
+  const sumReal = withExpected.reduce((s, r) => s + r.kg, 0);
+  const sumExpected = withExpected.reduce((s, r) => s + r.expected, 0);
+  const rendimientoPct = sumExpected > 0 ? Math.round((sumReal / sumExpected) * 1000) / 10 : null;
+  const exerciseCount = new Set(setRows.map(r => r.exerciseName)).size;
+
+  const kpiCards = `
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin:14px 0;">
+      <div style="flex:1;min-width:130px;background:#1f1f22;border-radius:10px;padding:12px 14px;">
+        <div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.03em;">Carga total</div>
+        <div style="font-size:19px;font-weight:700;margin-top:2px;">${Math.round(totalVolume).toLocaleString("es-ES")} kg</div>
+        <div style="font-size:11px;color:#777;">Volumen de trabajo</div>
+      </div>
+      ${rendimientoPct != null ? `
+      <div style="flex:1;min-width:130px;background:#1f1f22;border-radius:10px;padding:12px 14px;">
+        <div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.03em;">Rendimiento</div>
+        <div style="font-size:19px;font-weight:700;margin-top:2px;color:${rendimientoPct >= 100 ? '#34c579' : '#ff7a3d'};">${rendimientoPct}%</div>
+        <div style="font-size:11px;color:#777;">vs. sombra esperada</div>
+      </div>` : ``}
+      <div style="flex:1;min-width:130px;background:#1f1f22;border-radius:10px;padding:12px 14px;">
+        <div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.03em;">Series totales</div>
+        <div style="font-size:19px;font-weight:700;margin-top:2px;">${setRows.length}</div>
+        <div style="font-size:11px;color:#777;">${exerciseCount} ejercicio${exerciseCount === 1 ? "" : "s"}</div>
+      </div>
+    </div>`;
+
+  const tableRows = setRows.map(r => {
+    let estado, estadoColor;
+    if (r.expected == null) { estado = "—"; estadoColor = "#999"; }
+    else {
+      const diff = Math.round((r.kg - r.expected) * 10) / 10;
+      if (diff === 0) { estado = "Objetivo"; estadoColor = "#5b8def"; }
+      else if (diff > 0) { estado = `+${diff} kg (Superado)`; estadoColor = "#34c579"; }
+      else { estado = `${diff} kg`; estadoColor = "#ff5a2e"; }
+    }
+    return `<tr>
+      <td style="padding:7px 9px;border-bottom:1px solid #2a2a2c;font-weight:600;">${escapeHtmlEmail(r.exerciseName)}</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #2a2a2c;text-align:center;">S${r.setNum}</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #2a2a2c;text-align:center;">${r.reps} reps</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #2a2a2c;text-align:center;"><b>${r.kg} kg</b></td>
+      <td style="padding:7px 9px;border-bottom:1px solid #2a2a2c;text-align:center;color:#999;">${r.expected != null ? r.expected + " kg" : "—"}</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #2a2a2c;text-align:center;color:${estadoColor};font-weight:600;">${estado}</td>
+    </tr>`;
+  }).join("");
+
+  const commentHtml = comment ? `
+    <div style="margin-top:16px;background:#2a2410;border-left:3px solid #d9a441;border-radius:6px;padding:10px 14px;">
+      <b style="font-size:13px;">Comentario del entrenador:</b>
+      <div style="font-size:13px;color:#e8e8e8;margin-top:3px;">${escapeHtmlEmail(comment)}</div>
+    </div>` : "";
+
+  return `
+  <div style="font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#0f0f10;padding:28px 24px;border-radius:14px;color:#f2f2f2;">
+    <h1 style="font-size:20px;margin:0 0 4px;color:#ff7a3d;">RESUMEN DE ENTRENAMIENTO</h1>
+    <p style="margin:0 0 4px;font-size:13px;color:#ccc;">Sesión: <b>${escapeHtmlEmail(dayName)}</b> · Cliente: <b>${escapeHtmlEmail(username)}</b></p>
+    <p style="margin:0 0 18px;font-size:12px;color:#999;">Fecha: ${shortDMYEmail(session.date)}</p>
+    <div style="background:#1a1a1c;border-radius:10px;padding:18px;color:#e8e8e8;">
+      ${kpiCards}
+      ${dayBarChartImgTag(setRows)}
+      <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px;">
+        <thead><tr>
+          <th style="text-align:left;padding:6px 9px;border-bottom:2px solid #ff5a2e;font-size:11px;color:#999;">Ejercicio</th>
+          <th style="text-align:center;padding:6px 9px;border-bottom:2px solid #ff5a2e;font-size:11px;color:#999;">Serie</th>
+          <th style="text-align:center;padding:6px 9px;border-bottom:2px solid #ff5a2e;font-size:11px;color:#999;">Reps</th>
+          <th style="text-align:center;padding:6px 9px;border-bottom:2px solid #ff5a2e;font-size:11px;color:#999;">Carga real</th>
+          <th style="text-align:center;padding:6px 9px;border-bottom:2px solid #ff5a2e;font-size:11px;color:#999;">Sombra esperada</th>
+          <th style="text-align:center;padding:6px 9px;border-bottom:2px solid #ff5a2e;font-size:11px;color:#999;">Estado</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+      ${commentHtml}
+    </div>
+    <p style="margin:20px 0 0;font-size:12px;color:#777;">Informe de seguimiento • ADEANEASYFIT</p>
+  </div>`;
 }
 
 function buildProgressEmailHtml(username, data, frequency) {

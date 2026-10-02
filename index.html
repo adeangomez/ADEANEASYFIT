@@ -599,6 +599,8 @@ let activeTab = "train";
 let progressWindow = "week";
 let progressSearchQuery = "";
 let progressView = "carga";       // "carga" (progreso de peso levantado) | "peso" (peso corporal)
+let progressChartMode = "series"; // "series" (cada serie registrada) | "mensual" (evolución mes a mes)
+let progressRangeDays = null;     // null = todo el histórico, o 7/30/90 días
 let weightChartRange = "absolute"; // "month" | "quarter" | "semester" | "year" | "absolute"
 let userProfile = null; // { weightKg, heightCm, timeTraining, updatedAt }
 let weightReminderDismissed = false;
@@ -633,13 +635,100 @@ const STRENGTH_STANDARDS = {
   "Press militar con barra": { "0-3":0.35, "3-6":0.45, "6-12":0.55, "1-2a":0.70, "+2a":0.85 },
   "Remo con barra":          { "0-3":0.45, "3-6":0.60, "6-12":0.75, "1-2a":0.95, "+2a":1.15 },
 };
+// Cada ejercicio de la biblioteca se asocia al básico de STRENGTH_STANDARDS
+// biomecánicamente más parecido, con un coeficiente de ajuste (estimación
+// orientativa, no un estándar certificado por ejercicio). Así se puede
+// mostrar una línea de "peso esperado" para cualquier ejercicio, no solo
+// para los 4 básicos. Abdomen y los ejercicios de gemelo quedan fuera a
+// propósito (trabajo mayormente de peso corporal/repeticiones).
+const EXERCISE_EXPECTED_MAP = {
+  "Aperturas de pecho en máquina": { table:"Press banca", coef:0.30 },
+  "Aperturas de pecho en poleas": { table:"Press banca", coef:0.30 },
+  "Flexiones": { table:"Press banca", coef:0.50 },
+  "Fondos en máquina": { table:"Press banca", coef:0.90 },
+  "Fondos en paralelas": { table:"Press banca", coef:0.60 },
+  "Press declinado con barra": { table:"Press banca", coef:0.95 },
+  "Press de pecho en máquina": { table:"Press banca", coef:0.90 },
+  "Press inclinado en máquina": { table:"Press banca", coef:0.85 },
+  "Press inclinado con mancuernas": { table:"Press banca", coef:0.80 },
+  "Press inclinado en Smith": { table:"Press banca", coef:0.85 },
+  "Press plano con mancuernas": { table:"Press banca", coef:0.85 },
+  "Press plano en Smith": { table:"Press banca", coef:0.95 },
+  "Pull-over con mancuerna": { table:"Press banca", coef:0.40 },
+  "Press banca": { table:"Press banca", coef:1.00 },
+  "Dominadas": { table:"Remo con barra", coef:0.50 },
+  "Encogimientos con mancuernas": { table:"Remo con barra", coef:1.30 },
+  "Jalón al pecho": { table:"Remo con barra", coef:0.90 },
+  "Jalón en máquina": { table:"Remo con barra", coef:0.90 },
+  "Peso muerto": { table:"Peso muerto", coef:1.00 },
+  "Remo con mancuernas": { table:"Remo con barra", coef:0.85 },
+  "Remo con barra": { table:"Remo con barra", coef:1.00 },
+  "Remo en máquina": { table:"Remo con barra", coef:0.95 },
+  "Remo en T": { table:"Remo con barra", coef:1.00 },
+  "Face pull": { table:"Remo con barra", coef:0.25 },
+  "Extensión lumbar": { table:"Remo con barra", coef:0.30 },
+  "Jalón con agarre cerrado supino": { table:"Remo con barra", coef:0.90 },
+  "Elevaciones frontales con mancuernas": { table:"Press militar con barra", coef:0.25 },
+  "Pajaritos": { table:"Press militar con barra", coef:0.20 },
+  "Pec deck posterior invertido": { table:"Press militar con barra", coef:0.30 },
+  "Press militar con mancuernas": { table:"Press militar con barra", coef:0.80 },
+  "Aperturas de hombro en poleas": { table:"Press militar con barra", coef:0.20 },
+  "Aperturas de hombro": { table:"Press militar con barra", coef:0.20 },
+  "Press militar con barra": { table:"Press militar con barra", coef:1.00 },
+  "Remo vertical": { table:"Press militar con barra", coef:0.60 },
+  "Press militar en máquina": { table:"Press militar con barra", coef:0.90 },
+  "Apertura de hombro en máquina": { table:"Press militar con barra", coef:0.30 },
+  "Press Arnold": { table:"Press militar con barra", coef:0.75 },
+  "Curl con barra recta": { table:"Remo con barra", coef:0.35 },
+  "Curl con barra Z": { table:"Remo con barra", coef:0.35 },
+  "Curl en polea": { table:"Remo con barra", coef:0.32 },
+  "Curl concentrado": { table:"Remo con barra", coef:0.18 },
+  "Curl martillo": { table:"Remo con barra", coef:0.32 },
+  "Curl predicador con barra": { table:"Remo con barra", coef:0.28 },
+  "Curl predicador con mancuernas": { table:"Remo con barra", coef:0.26 },
+  "Curl predicador en máquina": { table:"Remo con barra", coef:0.30 },
+  "Curl con mancuernas alterno": { table:"Remo con barra", coef:0.28 },
+  "Curl bayesiano en polea": { table:"Remo con barra", coef:0.20 },
+  "Patada de tríceps en polea": { table:"Press banca", coef:0.15 },
+  "Extensión de tríceps trasnuca": { table:"Press banca", coef:0.30 },
+  "Patada de tríceps con mancuerna": { table:"Press banca", coef:0.15 },
+  "Press francés con barra Z": { table:"Press banca", coef:0.30 },
+  "Press de tríceps en máquina": { table:"Press banca", coef:0.35 },
+  "Flexión diamante de tríceps": { table:"Press banca", coef:0.40 },
+  "Fondos en máquina de tríceps": { table:"Press banca", coef:0.35 },
+  "Fondos libres de tríceps": { table:"Press banca", coef:0.40 },
+  "Press cerrado con barra": { table:"Press banca", coef:0.85 },
+  "Press francés con mancuernas": { table:"Press banca", coef:0.28 },
+  "Press francés en polea": { table:"Press banca", coef:0.28 },
+  "Extensión de tríceps en polea alta": { table:"Press banca", coef:0.30 },
+  "Press de tríceps unilateral en polea": { table:"Press banca", coef:0.15 },
+  "Curl femoral tumbado": { table:"Peso muerto", coef:0.35 },
+  "Curl femoral sentado": { table:"Peso muerto", coef:0.35 },
+  "Hip thrust": { table:"Peso muerto", coef:1.30 },
+  "Patada de glúteo en polea": { table:"Peso muerto", coef:0.15 },
+  "Peso muerto rumano con barra": { table:"Peso muerto", coef:0.80 },
+  "Peso muerto rumano con mancuernas": { table:"Peso muerto", coef:0.70 },
+  "Aductor externo en máquina": { table:"Peso muerto", coef:0.40 },
+  "Aductor interno en máquina": { table:"Peso muerto", coef:0.40 },
+  "Hack squat": { table:"Peso muerto", coef:1.10 },
+  "Prensa de piernas": { table:"Peso muerto", coef:2.00 },
+  "Sentadilla con barra": { table:"Peso muerto", coef:0.90 },
+  "Sentadilla pendular": { table:"Peso muerto", coef:1.10 },
+  "Zancadas con mancuernas": { table:"Peso muerto", coef:0.40 },
+  "Zancadas búlgaras": { table:"Peso muerto", coef:0.35 },
+  "Extensión de cuádriceps": { table:"Peso muerto", coef:0.50 },
+  "Extensión de gemelo sentado": { table:"Peso muerto", coef:0.70 },
+  "Extensión de gemelo de pie": { table:"Peso muerto", coef:0.70 },
+};
 function computeExpectedMax(exerciseName){
   if(!userProfile || !userProfile.weightKg || !userProfile.timeTraining) return null;
-  const table = STRENGTH_STANDARDS[exerciseName];
+  const map = EXERCISE_EXPECTED_MAP[exerciseName];
+  if(!map) return null;
+  const table = STRENGTH_STANDARDS[map.table];
   if(!table) return null;
   const mult = table[userProfile.timeTraining];
   if(!mult) return null;
-  return Math.round(userProfile.weightKg * mult * 2) / 2; // redondeo a 0.5kg
+  return Math.round(userProfile.weightKg * mult * map.coef * 2) / 2; // redondeo a 0.5kg
 }
 
 // -------------------- CANDADO DE 7 DÍAS PARA ACTUALIZAR EL PESO --------------------
@@ -2112,6 +2201,108 @@ function buildLineChartSvg(values, expected, emptyMessage){
   return svg + caption + gapHtml;
 }
 
+// Construye la serie de TODAS las series/sets registrados de un ejercicio
+// (no solo el máximo por sesión), en orden cronológico. opts permite acotar
+// por día de rutina y/o por una ventana de días hacia atrás (rangeDays).
+function buildExerciseSetPoints(exerciseName, opts){
+  opts = opts || {};
+  const points = [];
+  const cutoff = opts.rangeDays ? (Date.now() - opts.rangeDays*24*60*60*1000) : null;
+  state.sessions.forEach(sess=>{
+    if(cutoff != null && new Date(sess.date).getTime() < cutoff) return;
+    if(opts.dayName && sess.dayName !== opts.dayName) return;
+    const ex = sess.exercises.find(e => e.name === exerciseName);
+    if(ex){
+      (ex.sets || []).forEach(s=>{
+        if((s.kg||0) > 0){ points.push({ date: sess.date, kg: s.kg, reps: s.reps || 0 }); }
+      });
+    }
+  });
+  points.sort((a,b)=> new Date(a.date) - new Date(b.date));
+  return points;
+}
+
+// Igual que buildExerciseSetPoints pero agregado por mes (máximo kg del mes),
+// para la vista de evolución a largo plazo.
+function buildExerciseMonthlyPoints(exerciseName, opts){
+  opts = opts || {};
+  const byMonth = {};
+  state.sessions.forEach(sess=>{
+    if(opts.dayName && sess.dayName !== opts.dayName) return;
+    const ex = sess.exercises.find(e => e.name === exerciseName);
+    if(!ex) return;
+    const mx = exerciseMaxWeight(ex.sets);
+    if(mx <= 0) return;
+    const mk = monthKey(new Date(sess.date));
+    if(!byMonth[mk] || mx > byMonth[mk].kg){ byMonth[mk] = { kg: mx, reps: (ex.sets.find(s=>s.kg===mx)||{}).reps || 0, date: sess.date }; }
+  });
+  return Object.keys(byMonth).sort().map(mk => ({ monthKey: mk, kg: byMonth[mk].kg, reps: byMonth[mk].reps, date: byMonth[mk].date }));
+}
+
+// Gráfica de línea en SVG marcando cada serie registrada (kg en el eje Y,
+// repeticiones como etiqueta sobre cada punto), con línea de peso esperado.
+// cssClass: "mini-chart" (por defecto) o "big-chart" (Panel de clientes).
+function buildSetChartSvg(points, expected, emptyMessage, cssClass){
+  cssClass = cssClass || "mini-chart";
+  if(!points || points.length < 2){
+    return `<div class="chart-empty">${emptyMessage || "Necesitas al menos 2 series registradas de este ejercicio para ver la gráfica."}</div>`;
+  }
+  const values = points.map(p=>p.kg);
+  const W = 100, H = 40, padY = 4, padTop = 7;
+  let max = Math.max(...values);
+  let min = Math.min(...values);
+  if(expected != null){ max = Math.max(max, expected); min = Math.min(min, expected); }
+  const range = (max - min) || 1;
+  const stepX = W / (points.length - 1);
+  const yOf = (v) => (H - padY) - ((v - min) / range) * (H - padY - padTop);
+  const pts = points.map((p,i) => [i*stepX, yOf(p.kg)]);
+  const pathD = pts.map((p,i) => (i===0?"M":"L") + p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+  const areaD = pathD + ` L${pts[pts.length-1][0].toFixed(2)},${H} L0,${H} Z`;
+  const trendUp = values[values.length-1] >= values[0];
+  const lineColor = trendUp ? "#34c579" : "#ff5a2e";
+
+  const showLabels = points.length <= 24;
+  const dots = points.map((p,i) => {
+    const [x,y] = pts[i];
+    const label = showLabels ? `<text x="${x.toFixed(2)}" y="${(y-2.4).toFixed(2)}" font-size="3.4" text-anchor="middle" fill="#8a93a6">${p.reps}r</text>` : "";
+    const dateLabel = p.monthKey ? p.monthKey : new Date(p.date).toLocaleDateString("es-ES");
+    return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="1.6" fill="${lineColor}"><title>${p.kg}kg × ${p.reps} reps — ${dateLabel}</title></circle>${label}`;
+  }).join("");
+
+  let expectedLine = "";
+  if(expected != null){
+    const ey = yOf(expected);
+    expectedLine = `<line x1="0" y1="${ey.toFixed(2)}" x2="${W}" y2="${ey.toFixed(2)}" stroke="#d9a441" stroke-width="1" stroke-dasharray="3,2" vector-effect="non-scaling-stroke"/>`;
+  }
+
+  const svg = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="${cssClass}">
+      <path d="${areaD}" fill="${lineColor}" opacity="0.12" stroke="none"/>
+      ${expectedLine}
+      <path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}
+    </svg>`;
+
+  const caption = `
+    <div class="chart-caption">
+      <span>${min}kg</span>
+      <span class="${trendUp?'up':'down'}">${trendUp?'▲':'▼'} ${values[0]}kg (${points[0].reps}r) → ${values[values.length-1]}kg (${points[points.length-1].reps}r)</span>
+      <span>${max}kg</span>
+    </div>`;
+
+  let gapHtml = "";
+  if(expected != null){
+    const current = values[values.length-1];
+    const diff = current - expected;
+    const pct = (diff/expected)*100;
+    const cls = diff >= 0 ? "up" : "down";
+    const arrow = diff >= 0 ? "▲" : "▼";
+    gapHtml = `<div class="gap-badge ${cls}">${arrow} ${diff>=0?"+":""}${diff.toFixed(1)}kg frente a lo esperado para tu experiencia (${expected}kg) · ${pct>=0?"+":""}${pct.toFixed(0)}%</div>`;
+  }
+
+  return svg + caption + gapHtml;
+}
+
 function buildExerciseStats(windowType){
   const keyFn = windowType === "week" ? isoWeekKey : monthKey;
   const byExercise = {};
@@ -2327,10 +2518,31 @@ function renderStrengthProgress(){
     return;
   }
   const periodLabel = progressWindow === "week" ? "semana" : "mes";
+  html += `<div class="filter-row" style="margin-top:4px;">
+    <button data-cm="series" class="${progressChartMode==='series'?'active':''}">Por serie</button>
+    <button data-cm="mensual" class="${progressChartMode==='mensual'?'active':''}">Mensual</button>
+  </div>`;
+  if(progressChartMode === "series"){
+    html += `<div class="filter-row" style="margin-bottom:10px;">
+      <button data-rd="7" class="${progressRangeDays===7?'active':''}">7 días</button>
+      <button data-rd="30" class="${progressRangeDays===30?'active':''}">30 días</button>
+      <button data-rd="90" class="${progressRangeDays===90?'active':''}">90 días</button>
+      <button data-rd="all" class="${progressRangeDays==null?'active':''}">Todo</button>
+    </div>`;
+  }
   stats.forEach(st=>{
-    const series = buildExerciseTimeSeries(st.name).map(p => p.maxKg);
     const dayNames = getExerciseDayNames(st.name);
     const expected = computeExpectedMax(st.name);
+    let chartHtml, chartLabel;
+    if(progressChartMode === "mensual"){
+      const monthlyPoints = buildExerciseMonthlyPoints(st.name);
+      chartHtml = buildSetChartSvg(monthlyPoints, expected, "Necesitas al menos 2 meses con datos de este ejercicio para ver la gráfica mensual.");
+      chartLabel = "Evolución mensual (máximo por mes)";
+    } else {
+      const setPoints = buildExerciseSetPoints(st.name, { rangeDays: progressRangeDays });
+      chartHtml = buildSetChartSvg(setPoints, expected);
+      chartLabel = "Evolución por serie (kg y repeticiones)";
+    }
     html += `<div class="stat-card">
       <div class="stat-head"><h3>${st.name}</h3></div>
       ${dayNames.length ? `<div class="stat-day-tags">${dayNames.map(d=>`<span class="stat-day-tag">${d}</span>`).join("")}</div>` : ``}
@@ -2347,8 +2559,8 @@ function renderStrengthProgress(){
         </div>
       </div>
       <div class="chart-block">
-        <div class="m-label" style="margin-bottom:6px;">Evolución del peso máximo (histórico completo)${expected!=null ? ' · con expectativa para tu experiencia' : ''}</div>
-        ${buildLineChartSvg(series, expected)}
+        <div class="m-label" style="margin-bottom:6px;">${chartLabel}${expected!=null ? ' · con expectativa para tu experiencia' : ''}</div>
+        ${chartHtml}
       </div>
     </div>`;
   });
@@ -2357,6 +2569,12 @@ function renderStrengthProgress(){
   wireProgressEmailCard();
   wireAiAnalyzeButton();
   wireProgressSearch();
+  main.querySelectorAll("[data-cm]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ progressChartMode = btn.dataset.cm; renderProgress(); });
+  });
+  main.querySelectorAll("[data-rd]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ progressRangeDays = btn.dataset.rd === "all" ? null : parseInt(btn.dataset.rd,10); renderProgress(); });
+  });
   main.querySelectorAll(".filter-row button[data-w]").forEach(btn=>{
     btn.addEventListener("click", ()=>{ progressWindow = btn.dataset.w; renderProgress(); });
   });

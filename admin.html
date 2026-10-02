@@ -29,11 +29,11 @@
   .card h2{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14.5px; margin:0 0 14px; display:flex; align-items:center; gap:9px; letter-spacing:-0.005em; }
   .card h2 svg{ width:17px; height:17px; color:var(--iron); flex-shrink:0; }
   label{ display:block; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--faint); margin-bottom:5px; }
-  input{
+  input, textarea{
     width:100%; background:var(--card2); border:1px solid var(--line); color:var(--text);
     border-radius:9px; padding:11px 12px; font-size:14px; margin-bottom:12px; font-family:inherit;
   }
-  input:focus{ outline:none; border-color:var(--iron); }
+  input:focus, textarea:focus{ outline:none; border-color:var(--iron); }
   button{
     width:100%; background:var(--iron); color:#1a0b06; border:none; padding:12px;
     border-radius:10px; font-weight:700; font-size:13px; text-transform:uppercase; letter-spacing:0.01em; cursor:pointer;
@@ -543,13 +543,98 @@ const STRENGTH_STANDARDS = {
   "Press militar con barra": { "0-3":0.35, "3-6":0.45, "6-12":0.55, "1-2a":0.70, "+2a":0.85 },
   "Remo con barra":          { "0-3":0.45, "3-6":0.60, "6-12":0.75, "1-2a":0.95, "+2a":1.15 },
 };
+// Cada ejercicio de la biblioteca se asocia al básico de STRENGTH_STANDARDS
+// biomecánicamente más parecido, con un coeficiente de ajuste (estimación
+// orientativa, no un estándar certificado por ejercicio). Idéntico al mapa
+// de index.html, para que admin y cliente muestren la misma expectativa.
+const EXERCISE_EXPECTED_MAP = {
+  "Aperturas de pecho en máquina": { table:"Press banca", coef:0.30 },
+  "Aperturas de pecho en poleas": { table:"Press banca", coef:0.30 },
+  "Flexiones": { table:"Press banca", coef:0.50 },
+  "Fondos en máquina": { table:"Press banca", coef:0.90 },
+  "Fondos en paralelas": { table:"Press banca", coef:0.60 },
+  "Press declinado con barra": { table:"Press banca", coef:0.95 },
+  "Press de pecho en máquina": { table:"Press banca", coef:0.90 },
+  "Press inclinado en máquina": { table:"Press banca", coef:0.85 },
+  "Press inclinado con mancuernas": { table:"Press banca", coef:0.80 },
+  "Press inclinado en Smith": { table:"Press banca", coef:0.85 },
+  "Press plano con mancuernas": { table:"Press banca", coef:0.85 },
+  "Press plano en Smith": { table:"Press banca", coef:0.95 },
+  "Pull-over con mancuerna": { table:"Press banca", coef:0.40 },
+  "Press banca": { table:"Press banca", coef:1.00 },
+  "Dominadas": { table:"Remo con barra", coef:0.50 },
+  "Encogimientos con mancuernas": { table:"Remo con barra", coef:1.30 },
+  "Jalón al pecho": { table:"Remo con barra", coef:0.90 },
+  "Jalón en máquina": { table:"Remo con barra", coef:0.90 },
+  "Peso muerto": { table:"Peso muerto", coef:1.00 },
+  "Remo con mancuernas": { table:"Remo con barra", coef:0.85 },
+  "Remo con barra": { table:"Remo con barra", coef:1.00 },
+  "Remo en máquina": { table:"Remo con barra", coef:0.95 },
+  "Remo en T": { table:"Remo con barra", coef:1.00 },
+  "Face pull": { table:"Remo con barra", coef:0.25 },
+  "Extensión lumbar": { table:"Remo con barra", coef:0.30 },
+  "Jalón con agarre cerrado supino": { table:"Remo con barra", coef:0.90 },
+  "Elevaciones frontales con mancuernas": { table:"Press militar con barra", coef:0.25 },
+  "Pajaritos": { table:"Press militar con barra", coef:0.20 },
+  "Pec deck posterior invertido": { table:"Press militar con barra", coef:0.30 },
+  "Press militar con mancuernas": { table:"Press militar con barra", coef:0.80 },
+  "Aperturas de hombro en poleas": { table:"Press militar con barra", coef:0.20 },
+  "Aperturas de hombro": { table:"Press militar con barra", coef:0.20 },
+  "Press militar con barra": { table:"Press militar con barra", coef:1.00 },
+  "Remo vertical": { table:"Press militar con barra", coef:0.60 },
+  "Press militar en máquina": { table:"Press militar con barra", coef:0.90 },
+  "Apertura de hombro en máquina": { table:"Press militar con barra", coef:0.30 },
+  "Press Arnold": { table:"Press militar con barra", coef:0.75 },
+  "Curl con barra recta": { table:"Remo con barra", coef:0.35 },
+  "Curl con barra Z": { table:"Remo con barra", coef:0.35 },
+  "Curl en polea": { table:"Remo con barra", coef:0.32 },
+  "Curl concentrado": { table:"Remo con barra", coef:0.18 },
+  "Curl martillo": { table:"Remo con barra", coef:0.32 },
+  "Curl predicador con barra": { table:"Remo con barra", coef:0.28 },
+  "Curl predicador con mancuernas": { table:"Remo con barra", coef:0.26 },
+  "Curl predicador en máquina": { table:"Remo con barra", coef:0.30 },
+  "Curl con mancuernas alterno": { table:"Remo con barra", coef:0.28 },
+  "Curl bayesiano en polea": { table:"Remo con barra", coef:0.20 },
+  "Patada de tríceps en polea": { table:"Press banca", coef:0.15 },
+  "Extensión de tríceps trasnuca": { table:"Press banca", coef:0.30 },
+  "Patada de tríceps con mancuerna": { table:"Press banca", coef:0.15 },
+  "Press francés con barra Z": { table:"Press banca", coef:0.30 },
+  "Press de tríceps en máquina": { table:"Press banca", coef:0.35 },
+  "Flexión diamante de tríceps": { table:"Press banca", coef:0.40 },
+  "Fondos en máquina de tríceps": { table:"Press banca", coef:0.35 },
+  "Fondos libres de tríceps": { table:"Press banca", coef:0.40 },
+  "Press cerrado con barra": { table:"Press banca", coef:0.85 },
+  "Press francés con mancuernas": { table:"Press banca", coef:0.28 },
+  "Press francés en polea": { table:"Press banca", coef:0.28 },
+  "Extensión de tríceps en polea alta": { table:"Press banca", coef:0.30 },
+  "Press de tríceps unilateral en polea": { table:"Press banca", coef:0.15 },
+  "Curl femoral tumbado": { table:"Peso muerto", coef:0.35 },
+  "Curl femoral sentado": { table:"Peso muerto", coef:0.35 },
+  "Hip thrust": { table:"Peso muerto", coef:1.30 },
+  "Patada de glúteo en polea": { table:"Peso muerto", coef:0.15 },
+  "Peso muerto rumano con barra": { table:"Peso muerto", coef:0.80 },
+  "Peso muerto rumano con mancuernas": { table:"Peso muerto", coef:0.70 },
+  "Aductor externo en máquina": { table:"Peso muerto", coef:0.40 },
+  "Aductor interno en máquina": { table:"Peso muerto", coef:0.40 },
+  "Hack squat": { table:"Peso muerto", coef:1.10 },
+  "Prensa de piernas": { table:"Peso muerto", coef:2.00 },
+  "Sentadilla con barra": { table:"Peso muerto", coef:0.90 },
+  "Sentadilla pendular": { table:"Peso muerto", coef:1.10 },
+  "Zancadas con mancuernas": { table:"Peso muerto", coef:0.40 },
+  "Zancadas búlgaras": { table:"Peso muerto", coef:0.35 },
+  "Extensión de cuádriceps": { table:"Peso muerto", coef:0.50 },
+  "Extensión de gemelo sentado": { table:"Peso muerto", coef:0.70 },
+  "Extensión de gemelo de pie": { table:"Peso muerto", coef:0.70 },
+};
 function computeExpectedMax(profile, exerciseName){
   if(!profile || !profile.weightKg || !profile.timeTraining) return null;
-  const table = STRENGTH_STANDARDS[exerciseName];
+  const map = EXERCISE_EXPECTED_MAP[exerciseName];
+  if(!map) return null;
+  const table = STRENGTH_STANDARDS[map.table];
   if(!table) return null;
   const mult = table[profile.timeTraining];
   if(!mult) return null;
-  return Math.round(profile.weightKg * mult * 2) / 2;
+  return Math.round(profile.weightKg * mult * map.coef * 2) / 2;
 }
 
 function exerciseMaxWeight(sets){
@@ -598,6 +683,108 @@ function buildLineChartSvg(values, expected, emptyMsg, cssClass){
     <div class="chart-caption">
       <span>${min}kg</span>
       <span class="${trendUp?'up':'down'}">${trendUp?'▲':'▼'} ${values[0]}kg → ${values[values.length-1]}kg</span>
+      <span>${max}kg</span>
+    </div>`;
+
+  let gapHtml = "";
+  if(expected != null){
+    const current = values[values.length-1];
+    const diff = current - expected;
+    const pct = (diff/expected)*100;
+    const cls = diff >= 0 ? "up" : "down";
+    const arrow = diff >= 0 ? "▲" : "▼";
+    gapHtml = `<div class="gap-badge ${cls}">${arrow} ${diff>=0?"+":""}${diff.toFixed(1)}kg vs. esperado (${expected}kg) · ${pct>=0?"+":""}${pct.toFixed(0)}%</div>`;
+  }
+
+  return svg + caption + gapHtml;
+}
+
+// Construye la serie de TODAS las series/sets registrados de un ejercicio
+// (no solo el máximo por sesión), en orden cronológico. opts permite acotar
+// por día de rutina y/o por una ventana de días hacia atrás (rangeDays).
+function buildExerciseSetPointsAdmin(sessions, exerciseName, opts){
+  opts = opts || {};
+  const points = [];
+  const cutoff = opts.rangeDays ? (Date.now() - opts.rangeDays*24*60*60*1000) : null;
+  sessions.forEach(sess=>{
+    if(cutoff != null && new Date(sess.date).getTime() < cutoff) return;
+    if(opts.dayName && sess.dayName !== opts.dayName) return;
+    const ex = sess.exercises.find(e => e.name === exerciseName);
+    if(ex){
+      (ex.sets || []).forEach(s=>{
+        if((s.kg||0) > 0){ points.push({ date: sess.date, kg: s.kg, reps: s.reps || 0 }); }
+      });
+    }
+  });
+  points.sort((a,b)=> new Date(a.date) - new Date(b.date));
+  return points;
+}
+
+// Igual que buildExerciseSetPointsAdmin pero agregado por mes (máximo kg del mes).
+function buildExerciseMonthlyPointsAdmin(sessions, exerciseName, opts){
+  opts = opts || {};
+  const byMonth = {};
+  sessions.forEach(sess=>{
+    if(opts.dayName && sess.dayName !== opts.dayName) return;
+    const ex = sess.exercises.find(e => e.name === exerciseName);
+    if(!ex) return;
+    const mx = exerciseMaxWeight(ex.sets);
+    if(mx <= 0) return;
+    const d = new Date(sess.date);
+    const mk = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
+    if(!byMonth[mk] || mx > byMonth[mk].kg){ byMonth[mk] = { kg: mx, reps: (ex.sets.find(s=>s.kg===mx)||{}).reps || 0, date: sess.date }; }
+  });
+  return Object.keys(byMonth).sort().map(mk => ({ monthKey: mk, kg: byMonth[mk].kg, reps: byMonth[mk].reps, date: byMonth[mk].date }));
+}
+
+// Gráfica de línea en SVG marcando cada serie registrada (kg en el eje Y,
+// repeticiones como etiqueta sobre cada punto), con línea de peso esperado.
+// cssClass: "mini-chart" (por defecto) o "big-chart" (Panel de clientes).
+function buildSetChartSvg(points, expected, emptyMessage, cssClass){
+  cssClass = cssClass || "mini-chart";
+  if(!points || points.length < 2){
+    return `<div class="chart-empty">${emptyMessage || "Necesitas al menos 2 series registradas de este ejercicio para ver la gráfica."}</div>`;
+  }
+  const values = points.map(p=>p.kg);
+  const W = 100, H = 40, padY = 4, padTop = 7;
+  let max = Math.max(...values);
+  let min = Math.min(...values);
+  if(expected != null){ max = Math.max(max, expected); min = Math.min(min, expected); }
+  const range = (max - min) || 1;
+  const stepX = W / (points.length - 1);
+  const yOf = (v) => (H - padY) - ((v - min) / range) * (H - padY - padTop);
+  const pts = points.map((p,i) => [i*stepX, yOf(p.kg)]);
+  const pathD = pts.map((p,i) => (i===0?"M":"L") + p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+  const areaD = pathD + ` L${pts[pts.length-1][0].toFixed(2)},${H} L0,${H} Z`;
+  const trendUp = values[values.length-1] >= values[0];
+  const lineColor = trendUp ? "#34c579" : "#ff5a2e";
+
+  const showLabels = points.length <= 24;
+  const dots = points.map((p,i) => {
+    const [x,y] = pts[i];
+    const label = showLabels ? `<text x="${x.toFixed(2)}" y="${(y-2.4).toFixed(2)}" font-size="3.4" text-anchor="middle" fill="#8a93a6">${p.reps}r</text>` : "";
+    const dateLabel = p.monthKey ? p.monthKey : new Date(p.date).toLocaleDateString("es-ES");
+    return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="1.6" fill="${lineColor}"><title>${p.kg}kg × ${p.reps} reps — ${dateLabel}</title></circle>${label}`;
+  }).join("");
+
+  let expectedLine = "";
+  if(expected != null){
+    const ey = yOf(expected);
+    expectedLine = `<line x1="0" y1="${ey.toFixed(2)}" x2="${W}" y2="${ey.toFixed(2)}" stroke="#d9a441" stroke-width="1" stroke-dasharray="3,2" vector-effect="non-scaling-stroke"/>`;
+  }
+
+  const svg = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="${cssClass}">
+      <path d="${areaD}" fill="${lineColor}" opacity="0.12" stroke="none"/>
+      ${expectedLine}
+      <path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}
+    </svg>`;
+
+  const caption = `
+    <div class="chart-caption">
+      <span>${min}kg</span>
+      <span class="${trendUp?'up':'down'}">${trendUp?'▲':'▼'} ${values[0]}kg (${points[0].reps}r) → ${values[values.length-1]}kg (${points[points.length-1].reps}r)</span>
       <span>${max}kg</span>
     </div>`;
 
@@ -950,9 +1137,9 @@ function renderAdminStrengthView(username, data){
   const exerciseNames = [...new Set(sessions.flatMap(s => s.exercises.map(e => e.name)))];
   const allStats = exerciseNames.map(name => {
     const dayNames = getExerciseDayNames(sessions, name);
-    const series = buildExerciseTimeSeriesAdmin(sessions, name);
+    const points = buildExerciseSetPointsAdmin(sessions, name);
     const expected = computeExpectedMax(data.profile, name);
-    return { name, dayNames, series, expected };
+    return { name, dayNames, points, expected };
   });
   const filtered = allStats.filter(st => statMatchesQueryAdmin(st.name, st.dayNames, adminProgressSearchQuery));
 
@@ -965,7 +1152,7 @@ function renderAdminStrengthView(username, data){
       html += `<div class="stat-card">
         <h3>${st.name}</h3>
         ${st.dayNames.length ? `<div class="stat-day-tags">${st.dayNames.map(d=>`<span class="stat-day-tag">${d}</span>`).join("")}</div>` : ``}
-        ${buildLineChartSvg(st.series, st.expected)}
+        ${buildSetChartSvg(st.points, st.expected)}
       </div>`;
     });
   }
@@ -1513,6 +1700,10 @@ async function saveRoutineBuilder(){
 let clientPanelData = null;
 let clientPanelExercise = null;
 let clientPanelCurrentUser = null;
+let clientPanelMode = "dia";       // "dia" | "mensual" | "individual"
+let clientPanelDayIndex = 0;
+let clientPanelScope = "dia";      // (modo individual) "dia" | "semana"
+let clientPanelRangeDays = null;   // (modo individual) null=todo, o 7/30/90
 
 $("clientPanelUserSelect").addEventListener("change", () => {
   persistIfNeeded();
@@ -1534,6 +1725,7 @@ async function loadClientPanelFor(username){
     const data = await apiCall("/admin/user-data", { method:"POST", body: JSON.stringify({ username }) });
     clientPanelData = data;
     clientPanelExercise = null;
+    clientPanelDayIndex = 0;
     renderClientPanel();
   }catch(e){
     showMsg(msg, "Error: " + e.message, false);
@@ -1541,44 +1733,188 @@ async function loadClientPanelFor(username){
   }
 }
 
+function clientPanelActivePlan(){
+  const data = clientPanelData;
+  const plans = ((data && data.plans) || []).filter(p => Array.isArray(p.days) && p.days.length > 0);
+  if(plans.length === 0) return null;
+  return plans.find(p => p.id === data.activePlanId) || plans[0];
+}
+
 function renderClientPanel(){
   const body = $("clientPanelBody");
   const data = clientPanelData;
   const sessions = (data.state && data.state.sessions) || [];
-  const exerciseNames = [...new Set(sessions.flatMap(s => s.exercises.map(e => e.name)))];
+  const plan = clientPanelActivePlan();
 
-  if(exerciseNames.length === 0){
-    body.innerHTML = `<div style="color:var(--faint);font-size:12.5px;margin-top:16px;">Este cliente todavía no tiene ejercicios registrados.</div>`;
-    return;
+  let html = `<div class="filter-row" style="margin-top:14px;">
+    <button data-cpm="dia" class="${clientPanelMode==='dia'?'active':''}">Por día</button>
+    <button data-cpm="mensual" class="${clientPanelMode==='mensual'?'active':''}">Mensual</button>
+    <button data-cpm="individual" class="${clientPanelMode==='individual'?'active':''}">Individual por ejercicio</button>
+  </div>`;
+
+  if((clientPanelMode === "dia" || clientPanelMode === "mensual")){
+    if(!plan){
+      html += `<div style="color:var(--faint);font-size:12.5px;margin-top:10px;">Este cliente todavía no tiene una rutina asignada. Ve a "Rutinas" para crearle una.</div>`;
+      body.innerHTML = html;
+      wireClientPanelModeTabs();
+      return;
+    }
+    if(clientPanelDayIndex >= plan.days.length) clientPanelDayIndex = 0;
+    html += `<div class="filter-row" style="margin-top:10px;flex-wrap:wrap;">
+      ${plan.days.map((d,i) => `<button data-cpd="${i}" class="${i===clientPanelDayIndex?'active':''}">${i+1}. ${d.name}</button>`).join("")}
+    </div>`;
+    const day = plan.days[clientPanelDayIndex];
+    const exList = day.exercises || [];
+    if(!clientPanelExercise || !exList.some(e => e.name === clientPanelExercise)){
+      clientPanelExercise = exList.length ? exList[0].name : null;
+    }
+    html += `<div class="day-card" style="margin-top:10px;">
+      <div class="day-card-head"><h4 style="margin:0;">${day.name}</h4></div>`;
+    exList.forEach(ex => {
+      const lib = findExerciseByName(ex.name);
+      const imgUrl = lib ? exerciseImgUrl(lib.id) : "";
+      const isSel = ex.name === clientPanelExercise;
+      html += `<div class="ex-row" data-cpex="${escapeAttrAdmin(ex.name)}" style="cursor:pointer;${isSel?'outline:2px solid var(--accent,#ff5a2e);border-radius:10px;':''}">
+        <div class="ex-thumb" ${imgUrl ? `style="background-image:url('${imgUrl}')"` : ""}></div>
+        <div>${ex.name}</div>
+      </div>`;
+    });
+    html += `</div>`;
+    const savedEmail = localStorage.getItem("adeanfit_admin_notify_email") || "";
+    html += `<label style="margin-top:12px;">Comentario del entrenador (opcional, se incluye en el informe)</label>
+    <textarea id="clientPanelDayComment" rows="2" placeholder="Ej: buen ajuste en la primera serie, para la próxima semana subimos la sombra esperada…"></textarea>
+    <div class="copy-row" style="margin-top:10px;">
+      <input type="email" id="clientPanelDayEmailTo" placeholder="tu-email@ejemplo.com" value="${escapeAttrAdmin(savedEmail)}" style="margin-bottom:0;">
+      <button id="btnSendDayEmail">Enviar informe del día completo</button>
+    </div>
+    <div class="msg" id="clientPanelDayEmailMsg"></div>`;
+    html += `<div id="clientPanelExerciseBody"></div>`;
+  } else {
+    // Modo individual: cualquier ejercicio registrado alguna vez, con control
+    // de intervalo y de alcance (solo ese día vs semana completa).
+    const exerciseNames = [...new Set(sessions.flatMap(s => s.exercises.map(e => e.name)))];
+    if(exerciseNames.length === 0){
+      html += `<div style="color:var(--faint);font-size:12.5px;margin-top:10px;">Este cliente todavía no tiene ejercicios registrados.</div>`;
+      body.innerHTML = html;
+      wireClientPanelModeTabs();
+      return;
+    }
+    if(!clientPanelExercise || !exerciseNames.includes(clientPanelExercise)){
+      clientPanelExercise = exerciseNames[0];
+    }
+    html += `<label style="margin-top:12px;">Ejercicio</label>
+      <select id="clientPanelExerciseSelect">${exerciseNames.map(n => `<option value="${escapeAttrAdmin(n)}" ${n===clientPanelExercise?"selected":""}>${n}</option>`).join("")}</select>`;
+    html += `<div class="filter-row" style="margin-top:10px;">
+      <button data-cps="dia" class="${clientPanelScope==='dia'?'active':''}">Rutina diaria (solo un día)</button>
+      <button data-cps="semana" class="${clientPanelScope==='semana'?'active':''}">Rutina semanal completa</button>
+    </div>`;
+    if(clientPanelScope === "dia"){
+      const dayNames = getExerciseDayNames(sessions, clientPanelExercise);
+      html += `<div class="filter-row" style="margin-top:6px;flex-wrap:wrap;">
+        ${dayNames.map(d => `<button data-cpdn="${escapeAttrAdmin(d)}" class="${d===clientPanelDayName?'active':''}">${d}</button>`).join("")}
+      </div>`;
+    }
+    html += `<div class="filter-row" style="margin-top:6px;">
+      <button data-cpr="7" class="${clientPanelRangeDays===7?'active':''}">7 días</button>
+      <button data-cpr="30" class="${clientPanelRangeDays===30?'active':''}">30 días</button>
+      <button data-cpr="90" class="${clientPanelRangeDays===90?'active':''}">90 días</button>
+      <button data-cpr="all" class="${clientPanelRangeDays==null?'active':''}">Todo</button>
+    </div>`;
+    html += `<div id="clientPanelExerciseBody"></div>`;
   }
-  if(!clientPanelExercise || !exerciseNames.includes(clientPanelExercise)){
-    clientPanelExercise = exerciseNames[0];
-  }
 
-  body.innerHTML = `<label style="margin-top:14px;">Ejercicio</label>
-    <select id="clientPanelExerciseSelect">${exerciseNames.map(n => `<option value="${escapeAttrAdmin(n)}" ${n===clientPanelExercise?"selected":""}>${n}</option>`).join("")}</select>
-    <div id="clientPanelExerciseBody"></div>`;
+  body.innerHTML = html;
+  wireClientPanelModeTabs();
 
-  $("clientPanelExerciseSelect").addEventListener("change", (e) => {
-    clientPanelExercise = e.target.value;
+  if(clientPanelMode === "dia" || clientPanelMode === "mensual"){
+    body.querySelectorAll("[data-cpd]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ clientPanelDayIndex = parseInt(btn.dataset.cpd,10); clientPanelExercise = null; renderClientPanel(); });
+    });
+    body.querySelectorAll("[data-cpex]").forEach(row=>{
+      row.addEventListener("click", ()=>{ clientPanelExercise = row.dataset.cpex; renderClientPanel(); });
+    });
+    const dayEmailBtn = $("btnSendDayEmail");
+    if(dayEmailBtn){
+      dayEmailBtn.addEventListener("click", async () => {
+        const msg = $("clientPanelDayEmailMsg");
+        const to = $("clientPanelDayEmailTo").value.trim();
+        if(!to){ showMsg(msg, "Escribe a qué email quieres enviarlo.", false); return; }
+        localStorage.setItem("adeanfit_admin_notify_email", to);
+        dayEmailBtn.disabled = true; dayEmailBtn.textContent = "Enviando…";
+        const comment = ($("clientPanelDayComment") && $("clientPanelDayComment").value.trim()) || "";
+        try{
+          await apiCall("/admin/send-day-chart-email", { method:"POST", body: JSON.stringify({ username: clientPanelCurrentUser, dayName: plan.days[clientPanelDayIndex].name, to, comment }) });
+          showMsg(msg, "Enviado correctamente a " + to + ".", true);
+        }catch(e){
+          showMsg(msg, "No se pudo enviar: " + e.message, false);
+        } finally {
+          dayEmailBtn.disabled = false; dayEmailBtn.textContent = "Enviar informe del día completo";
+        }
+      });
+    }
+    if(clientPanelExercise) renderClientPanelExercise();
+  } else {
+    $("clientPanelExerciseSelect").addEventListener("change", (e) => {
+      clientPanelExercise = e.target.value;
+      clientPanelDayName = null;
+      renderClientPanel();
+    });
+    body.querySelectorAll("[data-cps]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ clientPanelScope = btn.dataset.cps; clientPanelDayName = null; renderClientPanel(); });
+    });
+    body.querySelectorAll("[data-cpdn]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ clientPanelDayName = btn.dataset.cpdn; renderClientPanel(); });
+    });
+    body.querySelectorAll("[data-cpr]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ clientPanelRangeDays = btn.dataset.cpr === "all" ? null : parseInt(btn.dataset.cpr,10); renderClientPanel(); });
+    });
     renderClientPanelExercise();
-  });
-
-  renderClientPanelExercise();
+  }
 }
+
+function wireClientPanelModeTabs(){
+  document.querySelectorAll("[data-cpm]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      clientPanelMode = btn.dataset.cpm;
+      clientPanelExercise = null;
+      clientPanelDayName = null;
+      renderClientPanel();
+    });
+  });
+}
+
+let clientPanelDayName = null; // (modo individual, alcance "dia") día elegido para filtrar
 
 function renderClientPanelExercise(){
   const exBody = $("clientPanelExerciseBody");
+  if(!exBody) return;
   const data = clientPanelData;
   const sessions = (data.state && data.state.sessions) || [];
   const name = clientPanelExercise;
   const lib = findExerciseByName(name);
-  const dayNames = getExerciseDayNames(sessions, name);
-  const series = buildExerciseTimeSeriesAdmin(sessions, name);
   const expected = computeExpectedMax(data.profile, name);
-
   const muscleLabel = lib ? (lib.sub ? `${lib.muscle} — ${lib.sub}` : lib.muscle) : "";
   const imgUrl = lib ? exerciseImgUrl(lib.id) : "";
+
+  let chartHtml, chartLabel;
+  if(clientPanelMode === "mensual"){
+    const plan = clientPanelActivePlan();
+    const dayName = plan ? plan.days[clientPanelDayIndex].name : null;
+    const monthlyPoints = buildExerciseMonthlyPointsAdmin(sessions, name, { dayName });
+    chartHtml = buildSetChartSvg(monthlyPoints, expected, "Necesitas al menos 2 meses con datos de este ejercicio para ver la gráfica mensual.", "big-chart");
+    chartLabel = "Evolución mensual (máximo por mes)";
+  } else if(clientPanelMode === "dia"){
+    const plan = clientPanelActivePlan();
+    const dayName = plan ? plan.days[clientPanelDayIndex].name : null;
+    const points = buildExerciseSetPointsAdmin(sessions, name, { dayName });
+    chartHtml = buildSetChartSvg(points, expected, "Necesitas al menos 2 series registradas de este ejercicio en este día para ver la gráfica.", "big-chart");
+    chartLabel = "Evolución por serie en este día (kg y repeticiones)";
+  } else {
+    const dayName = (clientPanelScope === "dia") ? clientPanelDayName : null;
+    const points = buildExerciseSetPointsAdmin(sessions, name, { dayName, rangeDays: clientPanelRangeDays });
+    chartHtml = buildSetChartSvg(points, expected, "Necesitas al menos 2 series registradas con estos filtros para ver la gráfica.", "big-chart");
+    chartLabel = "Evolución por serie (kg y repeticiones)";
+  }
 
   let html = `<div class="exercise-big-card">
     <div class="ex-thumb lg" ${imgUrl ? `style="background-image:url('${imgUrl}')"` : ""}></div>
@@ -1587,10 +1923,8 @@ function renderClientPanelExercise(){
       ${muscleLabel ? `<span class="muscle-tag">${muscleLabel}</span>` : ""}
     </div>
   </div>`;
-  if(dayNames.length){
-    html += `<div class="stat-day-tags">${dayNames.map(d => `<span class="stat-day-tag">${d}</span>`).join("")}</div>`;
-  }
-  html += buildLineChartSvg(series, expected, "Necesitas al menos 2 sesiones registradas de este ejercicio para ver la gráfica.", "big-chart");
+  html += `<div class="m-label" style="margin:8px 0 6px;">${chartLabel}${expected!=null ? ' · con expectativa para tu experiencia' : ''}</div>`;
+  html += chartHtml;
 
   const savedEmail = localStorage.getItem("adeanfit_admin_notify_email") || "";
   html += `<div class="copy-row" style="margin-top:14px;">
