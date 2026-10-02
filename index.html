@@ -1572,7 +1572,11 @@ function saveTrainDraft(day){
     let hasAny = false;
     inputs.forEach(inp=>{
       if(inp.value !== ""){
-        values[inp.dataset.ex + "-" + inp.dataset.set + "-" + inp.dataset.type] = inp.value;
+        // Se identifica cada serie por el NOMBRE del ejercicio (no por su
+        // posición en el array), para que sobreviva a quitar/añadir otros
+        // ejercicios o series solo-hoy sin perder lo ya tecleado.
+        const key = (inp.dataset.name || "") + "::" + inp.dataset.set + "::" + inp.dataset.type;
+        values[key] = inp.value;
         hasAny = true;
       }
     });
@@ -1614,10 +1618,12 @@ function restoreTrainDraft(day){
   // no tiene sentido rellenar campos de otro sitio.
   if(draft.planId !== (activePlanId || null) || draft.dayIndex !== state.currentDayIndex) return;
   let restoredAny = false;
-  Object.entries(draft.values).forEach(([key, value])=>{
-    const [exIdx, setIdx, type] = key.split("-");
-    const input = document.querySelector(`#sessionForm input[data-ex="${exIdx}"][data-set="${setIdx}"][data-type="${type}"]`);
-    if(input){ input.value = value; restoredAny = true; }
+  document.querySelectorAll("#sessionForm input").forEach(input=>{
+    const key = (input.dataset.name || "") + "::" + input.dataset.set + "::" + input.dataset.type;
+    if(draft.values[key] !== undefined){
+      input.value = draft.values[key];
+      restoredAny = true;
+    }
   });
   if(restoredAny){
     const banner = document.createElement("div");
@@ -1647,7 +1653,7 @@ function wireTodayEditControls(day){
       const exIdx = Number(btn.dataset.ex);
       if(exercises.length <= 1) return;
       exercises.splice(exIdx, 1);
-      clearTrainDraft();
+      saveTrainDraft(day);
       renderTrain();
     });
   });
@@ -1656,7 +1662,7 @@ function wireTodayEditControls(day){
       const exercises = getTrainExercises(day);
       const ex = exercises[Number(btn.dataset.ex)];
       ex.sets = Math.min(12, ex.sets + 1);
-      clearTrainDraft();
+      saveTrainDraft(day);
       renderTrain();
     });
   });
@@ -1665,7 +1671,7 @@ function wireTodayEditControls(day){
       const exercises = getTrainExercises(day);
       const ex = exercises[Number(btn.dataset.ex)];
       ex.sets = Math.max(1, ex.sets - 1);
-      clearTrainDraft();
+      saveTrainDraft(day);
       renderTrain();
     });
   });
@@ -1673,7 +1679,7 @@ function wireTodayEditControls(day){
   if(addBtn) addBtn.addEventListener("click", ()=>{
     const exercises = getTrainExercises(day);
     exercises.push({ name: "Press banca", sets: 3 });
-    clearTrainDraft();
+    saveTrainDraft(day);
     openExercisePicker(0, exercises.length - 1, "train");
   });
 }
@@ -1749,8 +1755,8 @@ function renderTrain(){
     for(let s=0; s<ex.sets; s++){
       html += `<div class="set-row">
         <div class="lbl">${s+1}</div>
-        <div class="field"><input inputmode="decimal" placeholder="0" data-ex="${exIdx}" data-set="${s}" data-type="kg"><span class="unit">KG</span></div>
-        <div class="field"><input inputmode="numeric" placeholder="0" data-ex="${exIdx}" data-set="${s}" data-type="reps"><span class="unit">REP</span></div>
+        <div class="field"><input inputmode="decimal" placeholder="0" data-ex="${exIdx}" data-set="${s}" data-type="kg" data-name="${escapeAttr(ex.name)}"><span class="unit">KG</span></div>
+        <div class="field"><input inputmode="numeric" placeholder="0" data-ex="${exIdx}" data-set="${s}" data-type="reps" data-name="${escapeAttr(ex.name)}"><span class="unit">REP</span></div>
       </div>`;
     }
     html += `</div>
@@ -3062,8 +3068,9 @@ function renderExercisePickerGrid(query){
 
 function selectExerciseForSlot(dayIdx, exIdx, exerciseName){
   if(pickerMode === "train"){
+    const day = activeDays()[state.currentDayIndex];
+    if(day) saveTrainDraft(day);
     sessionOverride.exercises[exIdx].name = exerciseName;
-    clearTrainDraft();
     closeExercisePicker();
     renderTrain();
     return;
