@@ -199,10 +199,6 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
       Clientes
     </button>
-    <button data-section="dayfix">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      Día actual
-    </button>
     <button data-section="suggestions">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.7 5.9 5.9 1.7-5.9 1.7-1.7 5.9-1.7-5.9-5.9-1.7 5.9-1.7z"/></svg>
       Ideas
@@ -288,21 +284,6 @@
       </select>
       <div class="msg" id="clientPanelMsg"></div>
       <div id="clientPanelBody"></div>
-    </div>
-  </div>
-
-  <div id="section-dayfix" class="admin-section" style="display:none;">
-    <div class="card">
-      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Corregir día actual del circuito</h2>
-      <div style="font-size:12.5px;color:var(--faint);margin-bottom:14px;">Herramienta de emergencia: úsala si a un usuario se le desincroniza el día que le toca en su rutina. Elige el usuario, la rutina y el día correctos.</div>
-      <label>Selecciona un usuario</label>
-      <select id="dayFixUserSelect">
-        <option value="">— Elige un usuario —</option>
-
-      </select>
-      <button id="btnLoadDayFix">Cargar</button>
-      <div class="msg" id="dayFixLoadMsg"></div>
-      <div id="dayFixResult"></div>
     </div>
   </div>
 
@@ -828,7 +809,6 @@ async function loadUsers(){
   const msg = $("listMsg");
   const listEl = $("userList");
   const selectEl = $("progressUserSelect");
-  const dayFixSelectEl = $("dayFixUserSelect");
   const testEmailSelectEl = $("testEmailUserSelect");
   const routinesSelectEl = $("routinesUserSelect");
   const clientPanelSelectEl = $("clientPanelUserSelect");
@@ -837,11 +817,9 @@ async function loadUsers(){
     listEl.innerHTML = "";
 
     const prevSelected = selectEl.value;
-    const prevDayFixSelected = dayFixSelectEl ? dayFixSelectEl.value : "";
     const prevRoutinesSelected = routinesSelectEl ? routinesSelectEl.value : "";
     const prevClientPanelSelected = clientPanelSelectEl ? clientPanelSelectEl.value : "";
     selectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
-    if(dayFixSelectEl) dayFixSelectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
     if(testEmailSelectEl) testEmailSelectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
     if(routinesSelectEl) routinesSelectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
     if(clientPanelSelectEl) clientPanelSelectEl.innerHTML = '<option value="">— Elige un usuario —</option>';
@@ -859,13 +837,6 @@ async function loadUsers(){
         opt.value = username;
         opt.textContent = suspended ? `${username} (suspendido)` : username;
         selectEl.appendChild(opt);
-
-        if(dayFixSelectEl){
-          const opt2 = document.createElement("option");
-          opt2.value = username;
-          opt2.textContent = suspended ? `${username} (suspendido)` : username;
-          dayFixSelectEl.appendChild(opt2);
-        }
 
         if(testEmailSelectEl){
           const opt3 = document.createElement("option");
@@ -930,7 +901,6 @@ async function loadUsers(){
         listEl.appendChild(li);
       });
       if(prevSelected){ selectEl.value = prevSelected; }
-      if(dayFixSelectEl && prevDayFixSelected){ dayFixSelectEl.value = prevDayFixSelected; }
       if(routinesSelectEl && prevRoutinesSelected){ routinesSelectEl.value = prevRoutinesSelected; }
       if(clientPanelSelectEl && prevClientPanelSelected){ clientPanelSelectEl.value = prevClientPanelSelected; }
     }
@@ -1240,78 +1210,6 @@ function bindWeightRangeButtons(username, data){
   }
 }
 
-// -------------------- Día actual del circuito (pestaña independiente) --------------------
-function renderDayFixSection(username, data){
-  const container = $("dayFixResult");
-  const allPlans = (data.plans || []).filter(p => Array.isArray(p.days) && p.days.length > 0);
-  const activePlan = allPlans.find(p => p.id === data.activePlanId) || allPlans[0];
-
-  if(!activePlan){
-    container.innerHTML = `<div style="color:var(--faint);font-size:12.5px;margin-top:14px;">Este usuario todavía no tiene ninguna rutina guardada.</div>`;
-    return;
-  }
-
-  const idx = (data.state && Number.isInteger(data.state.currentDayIndex)) ? data.state.currentDayIndex : 0;
-  const currentDayName = activePlan.days[idx] ? activePlan.days[idx].name : "?";
-  const planPickerHtml = allPlans.length > 1
-    ? `<label>Rutina</label>
-       <select id="fixPlanSelect">
-         ${allPlans.map(p => `<option value="${p.id}" ${p.id === activePlan.id ? "selected" : ""}>${p.name}${p.id === data.activePlanId ? " (activa)" : ""}</option>`).join("")}
-       </select>`
-    : "";
-
-  container.innerHTML = `<div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:14px;">
-    <div style="font-size:11px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Día actual del circuito (${activePlan.name})</div>
-    <div style="font-size:13.5px;margin-bottom:10px;">Le toca: <b>${currentDayName}</b> (día ${idx+1} de ${activePlan.days.length})</div>
-    <label>Corregir manualmente si está desincronizado</label>
-    ${planPickerHtml}
-    <select id="fixDaySelect">
-      ${activePlan.days.map((d,i)=>`<option value="${i}" ${i===idx?"selected":""}>${i+1}. ${d.name}</option>`).join("")}
-    </select>
-    <button class="secondary" id="btnFixDay">Guardar día correcto</button>
-    <div class="msg" id="fixDayMsg"></div>
-    ${allPlans.length > 1 ? `<div style="font-size:11px;color:var(--faint);margin-top:8px;">Si eliges una rutina distinta de la activa, esta pasará a ser la rutina activa del usuario al guardar.</div>` : ""}
-  </div>`;
-
-  bindDayFixControl(username, data);
-}
-
-function bindDayFixControl(username, data){
-  const btn = document.getElementById("btnFixDay");
-  if(!btn) return;
-
-  const allPlans = ((data && data.plans) || []).filter(p => Array.isArray(p.days) && p.days.length > 0);
-  const planSelect = document.getElementById("fixPlanSelect");
-  const daySelect = document.getElementById("fixDaySelect");
-
-  function repopulateDaySelect(){
-    if(!planSelect || !daySelect) return;
-    const plan = allPlans.find(p => p.id === planSelect.value);
-    if(!plan) return;
-    daySelect.innerHTML = plan.days.map((d,i)=>`<option value="${i}">${i+1}. ${d.name}</option>`).join("");
-  }
-
-  if(planSelect){
-    planSelect.addEventListener("change", repopulateDaySelect);
-  }
-
-  btn.addEventListener("click", async () => {
-    persistIfNeeded();
-    const msg = document.getElementById("fixDayMsg");
-    const dayIndex = Number(daySelect.value);
-    const planId = planSelect ? planSelect.value : (data && data.activePlanId);
-    btn.disabled = true; btn.textContent = "Guardando…";
-    try{
-      await apiCall("/admin/set-day", { method: "POST", body: JSON.stringify({ username, dayIndex, planId }) });
-      showMsg(msg, "Día corregido correctamente.", true);
-    }catch(e){
-      showMsg(msg, "Error: " + e.message, false);
-    } finally {
-      btn.disabled = false; btn.textContent = "Guardar día correcto";
-    }
-  });
-}
-
 async function loadUserProgressFor(username){
   const msg = $("progressMsg");
   const container = $("userProgressResult");
@@ -1366,27 +1264,6 @@ $("btnSendTestEmail").addEventListener("click", async () => {
   }finally{
     btn.disabled = false;
     btn.textContent = prevText;
-  }
-});
-
-$("btnLoadDayFix").addEventListener("click", async () => {
-  persistIfNeeded();
-  const username = $("dayFixUserSelect").value;
-  const msg = $("dayFixLoadMsg");
-  const container = $("dayFixResult");
-  if(!username){
-    showMsg(msg, "Elige primero un usuario de la lista.", false);
-    return;
-  }
-  msg.className = "msg";
-  container.innerHTML = '<div style="color:var(--faint);font-size:13px;margin-top:14px;">Cargando…</div>';
-  try{
-    const data = await apiCall("/admin/user-data", { method:"POST", body: JSON.stringify({ username }) });
-    msg.className = "msg";
-    renderDayFixSection(username, data);
-  }catch(e){
-    showMsg(msg, "Error: " + e.message, false);
-    container.innerHTML = "";
   }
 });
 
