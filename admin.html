@@ -1512,6 +1512,7 @@ async function saveRoutineBuilder(){
 // -------------------- PANEL DE CLIENTES --------------------
 let clientPanelData = null;
 let clientPanelExercise = null;
+let clientPanelCurrentUser = null;
 
 $("clientPanelUserSelect").addEventListener("change", () => {
   persistIfNeeded();
@@ -1521,6 +1522,7 @@ $("clientPanelUserSelect").addEventListener("change", () => {
 async function loadClientPanelFor(username){
   const msg = $("clientPanelMsg");
   const body = $("clientPanelBody");
+  clientPanelCurrentUser = username;
   if(!username){
     body.innerHTML = "";
     msg.className = "msg";
@@ -1589,7 +1591,32 @@ function renderClientPanelExercise(){
     html += `<div class="stat-day-tags">${dayNames.map(d => `<span class="stat-day-tag">${d}</span>`).join("")}</div>`;
   }
   html += buildLineChartSvg(series, expected, "Necesitas al menos 2 sesiones registradas de este ejercicio para ver la gráfica.", "big-chart");
+
+  const savedEmail = localStorage.getItem("adeanfit_admin_notify_email") || "";
+  html += `<div class="copy-row" style="margin-top:14px;">
+    <input type="email" id="clientPanelEmailTo" placeholder="tu-email@ejemplo.com" value="${escapeAttrAdmin(savedEmail)}" style="margin-bottom:0;">
+    <button id="btnSendChartEmail">Enviar por email</button>
+  </div>
+  <div class="msg" id="clientPanelEmailMsg"></div>`;
+
   exBody.innerHTML = html;
+
+  $("btnSendChartEmail").addEventListener("click", async () => {
+    const msg = $("clientPanelEmailMsg");
+    const to = $("clientPanelEmailTo").value.trim();
+    if(!to){ showMsg(msg, "Escribe a qué email quieres enviarlo.", false); return; }
+    localStorage.setItem("adeanfit_admin_notify_email", to);
+    const btn = $("btnSendChartEmail");
+    btn.disabled = true; btn.textContent = "Enviando…";
+    try{
+      await apiCall("/admin/send-exercise-chart-email", { method:"POST", body: JSON.stringify({ username: clientPanelCurrentUser, exerciseName: name, to }) });
+      showMsg(msg, "Enviado correctamente a " + to + ".", true);
+    }catch(e){
+      showMsg(msg, "No se pudo enviar: " + e.message, false);
+    } finally {
+      btn.disabled = false; btn.textContent = "Enviar por email";
+    }
+  });
 }
 
 // -------------------- SUGERENCIAS DE EJERCICIOS --------------------
