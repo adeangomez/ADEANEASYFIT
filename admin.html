@@ -738,7 +738,7 @@ function buildSetChartSvg(points, expected, emptyMessage, cssClass){
   const pathD = pts.map((p,i) => (i===0?"M":"L") + p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
   const areaD = pathD + ` L${pts[pts.length-1][0].toFixed(2)},${H} L0,${H} Z`;
   const trendUp = values[values.length-1] >= values[0];
-  const lineColor = trendUp ? "#34c579" : "#ff5a2e";
+  const lineColor = "#ff7a3d";
 
   const showLabels = points.length <= 24;
   const dots = points.map((p,i) => {
@@ -1579,6 +1579,7 @@ let clientPanelExercise = null;
 let clientPanelCurrentUser = null;
 let clientPanelMode = "dia";       // "dia" | "mensual" | "individual"
 let clientPanelDayIndex = 0;
+let clientPanelSessionDate = null; // (modo "dia") fecha concreta elegida de entre las sesiones registradas para ese día; null = la más reciente
 let clientPanelScope = "dia";      // (modo individual) "dia" | "semana"
 let clientPanelRangeDays = null;   // (modo individual) null=todo, o 7/30/90
 
@@ -1603,6 +1604,7 @@ async function loadClientPanelFor(username){
     clientPanelData = data;
     clientPanelExercise = null;
     clientPanelDayIndex = 0;
+    clientPanelSessionDate = null;
     renderClientPanel();
   }catch(e){
     showMsg(msg, "Error: " + e.message, false);
@@ -1657,6 +1659,27 @@ function renderClientPanel(){
       </div>`;
     });
     html += `</div>`;
+
+    // Modo "día": además de elegir el día de rutina, se puede elegir CUÁL de
+    // las fechas registradas para ese día usar (en vez de asumir siempre la
+    // más reciente) — tanto para el informe por email como para el
+    // desglose que se muestra debajo.
+    let daySessionsForPicker = [];
+    if(clientPanelMode === "dia"){
+      daySessionsForPicker = sessions.filter(s => s.dayName === day.name).sort((a,b)=> new Date(b.date) - new Date(a.date));
+      if(daySessionsForPicker.length){
+        if(!clientPanelSessionDate || !daySessionsForPicker.some(s=>s.date===clientPanelSessionDate)){
+          clientPanelSessionDate = daySessionsForPicker[0].date;
+        }
+        html += `<label style="margin-top:12px;">Fecha registrada a usar</label>
+        <div class="filter-row" style="margin-top:4px;flex-wrap:wrap;">
+          ${daySessionsForPicker.map(s => `<button data-cpsd="${escapeAttrAdmin(s.date)}" class="${s.date===clientPanelSessionDate?'active':''}">${new Date(s.date).toLocaleDateString("es-ES")}</button>`).join("")}
+        </div>`;
+      } else {
+        clientPanelSessionDate = null;
+      }
+    }
+
     const savedEmail = localStorage.getItem("adeanfit_admin_notify_email") || "";
     html += `<label style="margin-top:12px;">Comentario del entrenador (opcional, se incluye en el informe)</label>
     <textarea id="clientPanelDayComment" rows="2" placeholder="Ej: buen ajuste en la primera serie, para la próxima semana subimos la sombra esperada…"></textarea>
@@ -1705,10 +1728,13 @@ function renderClientPanel(){
 
   if(clientPanelMode === "dia" || clientPanelMode === "mensual"){
     body.querySelectorAll("[data-cpd]").forEach(btn=>{
-      btn.addEventListener("click", ()=>{ clientPanelDayIndex = parseInt(btn.dataset.cpd,10); clientPanelExercise = null; renderClientPanel(); });
+      btn.addEventListener("click", ()=>{ clientPanelDayIndex = parseInt(btn.dataset.cpd,10); clientPanelExercise = null; clientPanelSessionDate = null; renderClientPanel(); });
     });
     body.querySelectorAll("[data-cpex]").forEach(row=>{
       row.addEventListener("click", ()=>{ clientPanelExercise = row.dataset.cpex; renderClientPanel(); });
+    });
+    body.querySelectorAll("[data-cpsd]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ clientPanelSessionDate = btn.dataset.cpsd; renderClientPanel(); });
     });
     const dayEmailBtn = $("btnSendDayEmail");
     if(dayEmailBtn){
@@ -1720,7 +1746,7 @@ function renderClientPanel(){
         dayEmailBtn.disabled = true; dayEmailBtn.textContent = "Enviando…";
         const comment = ($("clientPanelDayComment") && $("clientPanelDayComment").value.trim()) || "";
         try{
-          await apiCall("/admin/send-day-chart-email", { method:"POST", body: JSON.stringify({ username: clientPanelCurrentUser, dayName: plan.days[clientPanelDayIndex].name, to, comment }) });
+          await apiCall("/admin/send-day-chart-email", { method:"POST", body: JSON.stringify({ username: clientPanelCurrentUser, dayName: plan.days[clientPanelDayIndex].name, to, comment, sessionDate: clientPanelMode === "dia" ? clientPanelSessionDate : null }) });
           showMsg(msg, "Enviado correctamente a " + to + ".", true);
         }catch(e){
           showMsg(msg, "No se pudo enviar: " + e.message, false);
@@ -1755,6 +1781,7 @@ function wireClientPanelModeTabs(){
       clientPanelMode = btn.dataset.cpm;
       clientPanelExercise = null;
       clientPanelDayName = null;
+      clientPanelSessionDate = null;
       renderClientPanel();
     });
   });
@@ -1803,31 +1830,39 @@ function renderClientPanelExercise(){
   html += `<div class="m-label" style="margin:8px 0 6px;">${chartLabel}${expected!=null ? ' · con expectativa para tu experiencia' : ''}</div>`;
   html += chartHtml;
 
-  const savedEmail = localStorage.getItem("adeanfit_admin_notify_email") || "";
-  html += `<div class="copy-row" style="margin-top:14px;">
-    <input type="email" id="clientPanelEmailTo" placeholder="tu-email@ejemplo.com" value="${escapeAttrAdmin(savedEmail)}" style="margin-bottom:0;">
-    <button id="btnSendChartEmail">Enviar por email</button>
-  </div>
-  <div class="msg" id="clientPanelEmailMsg"></div>`;
+  // El envío por email de este ejercicio suelto solo tiene sentido en modo
+  // "Individual por ejercicio": en "Por día"/"Mensual" ya existe el botón de
+  // "Enviar informe del día completo" justo encima (sería un duplicado).
+  const showExerciseEmailBox = clientPanelMode === "individual";
+  if(showExerciseEmailBox){
+    const savedEmail = localStorage.getItem("adeanfit_admin_notify_email") || "";
+    html += `<div class="copy-row" style="margin-top:14px;">
+      <input type="email" id="clientPanelEmailTo" placeholder="tu-email@ejemplo.com" value="${escapeAttrAdmin(savedEmail)}" style="margin-bottom:0;">
+      <button id="btnSendChartEmail">Enviar por email</button>
+    </div>
+    <div class="msg" id="clientPanelEmailMsg"></div>`;
+  }
 
   exBody.innerHTML = html;
 
-  $("btnSendChartEmail").addEventListener("click", async () => {
-    const msg = $("clientPanelEmailMsg");
-    const to = $("clientPanelEmailTo").value.trim();
-    if(!to){ showMsg(msg, "Escribe a qué email quieres enviarlo.", false); return; }
-    localStorage.setItem("adeanfit_admin_notify_email", to);
-    const btn = $("btnSendChartEmail");
-    btn.disabled = true; btn.textContent = "Enviando…";
-    try{
-      await apiCall("/admin/send-exercise-chart-email", { method:"POST", body: JSON.stringify({ username: clientPanelCurrentUser, exerciseName: name, to }) });
-      showMsg(msg, "Enviado correctamente a " + to + ".", true);
-    }catch(e){
-      showMsg(msg, "No se pudo enviar: " + e.message, false);
-    } finally {
-      btn.disabled = false; btn.textContent = "Enviar por email";
-    }
-  });
+  if(showExerciseEmailBox){
+    $("btnSendChartEmail").addEventListener("click", async () => {
+      const msg = $("clientPanelEmailMsg");
+      const to = $("clientPanelEmailTo").value.trim();
+      if(!to){ showMsg(msg, "Escribe a qué email quieres enviarlo.", false); return; }
+      localStorage.setItem("adeanfit_admin_notify_email", to);
+      const btn = $("btnSendChartEmail");
+      btn.disabled = true; btn.textContent = "Enviando…";
+      try{
+        await apiCall("/admin/send-exercise-chart-email", { method:"POST", body: JSON.stringify({ username: clientPanelCurrentUser, exerciseName: name, to }) });
+        showMsg(msg, "Enviado correctamente a " + to + ".", true);
+      }catch(e){
+        showMsg(msg, "No se pudo enviar: " + e.message, false);
+      } finally {
+        btn.disabled = false; btn.textContent = "Enviar por email";
+      }
+    });
+  }
 }
 
 // -------------------- SUGERENCIAS DE EJERCICIOS --------------------

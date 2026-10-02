@@ -254,6 +254,20 @@
   .chart-caption .up{ color:var(--up); font-weight:700; }
   .chart-caption .down{ color:var(--down); font-weight:700; }
   .chart-empty{ font-size:11.5px; color:var(--text-faint); font-style:italic; padding:8px 0; }
+  .big-chart{ width:100%; height:200px; display:block; }
+
+  /* Panel de progreso por día (igual esquema que el Panel de clientes del admin) */
+  .day-card{ background: var(--card-2); border:1px solid var(--line-soft); border-radius: var(--radius); padding:12px 13px; margin-bottom:10px; }
+  .day-card-head{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .ex-row{ display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; margin-bottom:6px; }
+  .ex-row:hover{ background: rgba(255,255,255,0.03); }
+  .exercise-big-card{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+  .exercise-big-card h3{ margin:0 0 3px; font-size:16px; font-weight:700; }
+  .exercise-big-card .muscle-tag{ font-size:10.5px; color:var(--steel); background:var(--card-2); border:1px solid var(--line-soft); border-radius:100px; padding:3px 9px; display:inline-block; }
+  .ex-thumb.lg{ width:72px; height:72px; border-radius:12px; }
+  .copy-row{ display:flex; gap:8px; align-items:center; }
+  .copy-row input{ margin-bottom:0; flex:1; }
+  .copy-row button{ width:auto; flex-shrink:0; padding:11px 14px; font-size:13px; }
 
   /* IA */
   .ai-card{ margin-bottom:16px; }
@@ -596,11 +610,14 @@ let state = null;
 let plans = [];            // [{id, name, createdAt, days:[{name, sub, exercises:[{name,sets}]}]}]
 let activePlanId = null;
 let activeTab = "train";
-let progressWindow = "week";
-let progressSearchQuery = "";
 let progressView = "carga";       // "carga" (progreso de peso levantado) | "peso" (peso corporal)
-let progressChartMode = "series"; // "series" (cada serie registrada) | "mensual" (evolución mes a mes)
-let progressRangeDays = null;     // null = todo el histórico, o 7/30/90 días
+let progressPanelMode = "dia";       // "dia" | "mensual" | "individual" (igual que el Panel de clientes del admin)
+let progressPanelDayIndex = 0;
+let progressPanelSessionDate = null; // (modo "dia") fecha concreta elegida entre las sesiones registradas para ese día; null = la más reciente
+let progressPanelExercise = null;
+let progressPanelScope = "dia";      // (modo individual) "dia" | "semana"
+let progressPanelDayName = null;     // (modo individual, alcance "dia") día elegido para filtrar
+let progressPanelRangeDays = null;   // (modo individual) null=todo, o 7/30/90
 let weightChartRange = "absolute"; // "month" | "quarter" | "semester" | "year" | "absolute"
 let userProfile = null; // { weightKg, heightCm, timeTraining, updatedAt }
 let weightReminderDismissed = false;
@@ -2259,7 +2276,7 @@ function buildSetChartSvg(points, expected, emptyMessage, cssClass){
   const pathD = pts.map((p,i) => (i===0?"M":"L") + p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
   const areaD = pathD + ` L${pts[pts.length-1][0].toFixed(2)},${H} L0,${H} Z`;
   const trendUp = values[values.length-1] >= values[0];
-  const lineColor = trendUp ? "#34c579" : "#ff5a2e";
+  const lineColor = "#ff7a3d";
 
   const showLabels = points.length <= 24;
   const dots = points.map((p,i) => {
@@ -2303,74 +2320,12 @@ function buildSetChartSvg(points, expected, emptyMessage, cssClass){
   return svg + caption + gapHtml;
 }
 
-function buildExerciseStats(windowType){
-  const keyFn = windowType === "week" ? isoWeekKey : monthKey;
-  const byExercise = {};
-  state.sessions.forEach(sess=>{
-    const d = new Date(sess.date);
-    const key = keyFn(d);
-    sess.exercises.forEach(ex=>{
-      if(!byExercise[ex.name]) byExercise[ex.name] = {};
-      if(!byExercise[ex.name][key]) byExercise[ex.name][key] = { volume:0, maxKg:0 };
-      byExercise[ex.name][key].volume += exerciseVolume(ex.sets);
-      const mx = exerciseMaxWeight(ex.sets);
-      if(mx > byExercise[ex.name][key].maxKg) byExercise[ex.name][key].maxKg = mx;
-    });
-  });
-  const results = [];
-  Object.entries(byExercise).forEach(([name, periods])=>{
-    const keys = Object.keys(periods).sort();
-    if(keys.length === 0) return;
-    const lastKey = keys[keys.length-1];
-    const prevKey = keys.length >= 2 ? keys[keys.length-2] : null;
-    results.push({ name, lastKey, prevKey, last: periods[lastKey], prev: prevKey ? periods[prevKey] : null });
-  });
-  results.sort((a,b)=> a.name.localeCompare(b.name));
-  return results;
-}
-
-function deltaBlock(current, previous){
-  if(previous === null || previous === undefined) return `<span class="no-data">Aún no hay periodo anterior para comparar</span>`;
-  if(previous === 0) return `<span class="no-data">Sin dato previo comparable</span>`;
-  const diff = current - previous;
-  const pct = (diff / previous) * 100;
-  let cls = "flat", arrow = "→";
-  if(pct > 0.5){ cls = "up"; arrow = "▲"; }
-  else if(pct < -0.5){ cls = "down"; arrow = "▼"; }
-  return `<span class="delta ${cls}">${arrow} ${pct>0?"+":""}${pct.toFixed(1)}%</span>`;
-}
-
 function getExerciseDayNames(exerciseName){
   const days = new Set();
   state.sessions.forEach(sess=>{
     if(sess.exercises.some(e => e.name === exerciseName)) days.add(sess.dayName);
   });
   return Array.from(days);
-}
-
-function statMatchesQuery(st, q){
-  if(!q) return true;
-  const nq = normalizeText(q);
-  if(normalizeText(st.name).includes(nq)) return true;
-  if(getExerciseDayNames(st.name).some(d => normalizeText(d).includes(nq))) return true;
-  const libEx = findExerciseByName(st.name);
-  if(libEx){
-    if(libEx.sub){
-      const subSyns = SUB_SYNONYMS[libEx.sub] || [normalizeText(libEx.sub)];
-      if(subSyns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s)))) return true;
-    }
-    const secondaryList = libEx.secondary || [];
-    if(secondaryList.some(sec => {
-      const subSyns = SUB_SYNONYMS[sec];
-      return subSyns ? subSyns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s))) : false;
-    })) return true;
-    const allMuscles = [libEx.muscle, ...secondaryList];
-    if(allMuscles.some(m => {
-      const syns = MUSCLE_SYNONYMS[m] || [];
-      return syns.some(s => normalizeText(s).includes(nq) || nq.includes(normalizeText(s)));
-    })) return true;
-  }
-  return false;
 }
 
 function renderProgress(){
@@ -2468,19 +2423,17 @@ function wireProgressEmailCard(){
 }
 
 // -------------------- Sub-vista: progreso de carga (peso levantado por ejercicio) --------------------
+// Panel de progreso de carga: mismo esquema que el Panel de clientes del
+// admin (Por día / Mensual / Individual por ejercicio), pero para el propio
+// cliente — sin comentario de entrenador, con la opción de mandarse el
+// informe al momento, y sin perder la preferencia de envío periódico ya
+// existente (arriba del todo, en progressEmailCardHtml()).
 function renderStrengthProgress(){
   const main = document.getElementById("main");
   let html = progressViewTabsHtml();
-  html += `
-    <div class="section-title"><h2>Progreso</h2></div>
-  `;
+  html += `<div class="section-title"><h2>Progreso</h2></div>`;
   html += progressEmailCardHtml();
   html += `
-    <div class="filter-row">
-      <button data-w="week" class="${progressWindow==='week'?'active':''}">Semanal</button>
-      <button data-w="month" class="${progressWindow==='month'?'active':''}">Mensual</button>
-    </div>
-    <input type="text" id="progressSearchInput" class="ex-search-input" placeholder="Buscar por ejercicio, día ('Torso A') o grupo ('pecho')…" value="${escapeAttr(progressSearchQuery)}">
     <div class="ai-card" id="aiAnalyzeCard">
       <button class="btn-ai" id="aiAnalyzeBtn"><span class="ic">${ICON_SPARKLE}</span>Analizar mi progreso con IA</button>
       <div id="aiAnalyzeResult"></div>
@@ -2493,91 +2446,249 @@ function renderStrengthProgress(){
     wireProgressViewTabs();
     wireProgressEmailCard();
     wireAiAnalyzeButton();
-    wireProgressSearch();
     return;
   }
-  const allStats = buildExerciseStats(progressWindow);
-  const stats = allStats.filter(st => statMatchesQuery(st, progressSearchQuery));
 
-  if(allStats.length === 0){
-    html += `<div class="empty"><div>Aún no hay datos suficientes para este periodo.</div></div>`;
-    main.innerHTML = html;
-    wireProgressViewTabs();
-    wireProgressEmailCard();
-    wireAiAnalyzeButton();
-    wireProgressSearch();
-    return;
-  }
-  if(stats.length === 0){
-    html += `<div class="empty"><div>Ningún ejercicio ni día coincide con "${escapeAttr(progressSearchQuery)}".</div></div>`;
-    main.innerHTML = html;
-    wireProgressViewTabs();
-    wireProgressEmailCard();
-    wireAiAnalyzeButton();
-    wireProgressSearch();
-    return;
-  }
-  const periodLabel = progressWindow === "week" ? "semana" : "mes";
-  html += `<div class="filter-row" style="margin-top:4px;">
-    <button data-cm="series" class="${progressChartMode==='series'?'active':''}">Por serie</button>
-    <button data-cm="mensual" class="${progressChartMode==='mensual'?'active':''}">Mensual</button>
+  html += `<div class="filter-row" style="margin-top:14px;">
+    <button data-ppm="dia" class="${progressPanelMode==='dia'?'active':''}">Por día</button>
+    <button data-ppm="mensual" class="${progressPanelMode==='mensual'?'active':''}">Mensual</button>
+    <button data-ppm="individual" class="${progressPanelMode==='individual'?'active':''}">Individual por ejercicio</button>
   </div>`;
-  if(progressChartMode === "series"){
-    html += `<div class="filter-row" style="margin-bottom:10px;">
-      <button data-rd="7" class="${progressRangeDays===7?'active':''}">7 días</button>
-      <button data-rd="30" class="${progressRangeDays===30?'active':''}">30 días</button>
-      <button data-rd="90" class="${progressRangeDays===90?'active':''}">90 días</button>
-      <button data-rd="all" class="${progressRangeDays==null?'active':''}">Todo</button>
-    </div>`;
-  }
-  stats.forEach(st=>{
-    const dayNames = getExerciseDayNames(st.name);
-    const expected = computeExpectedMax(st.name);
-    let chartHtml, chartLabel;
-    if(progressChartMode === "mensual"){
-      const monthlyPoints = buildExerciseMonthlyPoints(st.name);
-      chartHtml = buildSetChartSvg(monthlyPoints, expected, "Necesitas al menos 2 meses con datos de este ejercicio para ver la gráfica mensual.");
-      chartLabel = "Evolución mensual (máximo por mes)";
-    } else {
-      const setPoints = buildExerciseSetPoints(st.name, { rangeDays: progressRangeDays });
-      chartHtml = buildSetChartSvg(setPoints, expected);
-      chartLabel = "Evolución por serie (kg y repeticiones)";
+
+  const plan = activePlan();
+
+  if(progressPanelMode === "dia" || progressPanelMode === "mensual"){
+    if(!plan || !plan.days || plan.days.length === 0){
+      html += `<div class="empty"><div>Todavía no tienes una rutina asignada.</div></div>`;
+      main.innerHTML = html;
+      wireProgressViewTabs();
+      wireProgressEmailCard();
+      wireAiAnalyzeButton();
+      wireProgressPanelModeTabs();
+      return;
     }
-    html += `<div class="stat-card">
-      <div class="stat-head"><h3>${st.name}</h3></div>
-      ${dayNames.length ? `<div class="stat-day-tags">${dayNames.map(d=>`<span class="stat-day-tag">${d}</span>`).join("")}</div>` : ``}
-      <div class="stat-grid">
-        <div class="metric">
-          <div class="m-label">Volumen (kg×reps) — última ${periodLabel}</div>
-          <div class="m-value">${Math.round(st.last.volume)}</div>
-          ${deltaBlock(st.last.volume, st.prev ? st.prev.volume : null)}
-        </div>
-        <div class="metric">
-          <div class="m-label">Peso máx. — última ${periodLabel}</div>
-          <div class="m-value">${st.last.maxKg} kg</div>
-          ${deltaBlock(st.last.maxKg, st.prev ? st.prev.maxKg : null)}
-        </div>
-      </div>
-      <div class="chart-block">
-        <div class="m-label" style="margin-bottom:6px;">${chartLabel}${expected!=null ? ' · con expectativa para tu experiencia' : ''}</div>
-        ${chartHtml}
-      </div>
+    if(progressPanelDayIndex >= plan.days.length) progressPanelDayIndex = 0;
+    html += `<div class="filter-row" style="margin-top:10px;flex-wrap:wrap;">
+      ${plan.days.map((d,i) => `<button data-ppd="${i}" class="${i===progressPanelDayIndex?'active':''}">${i+1}. ${d.name}</button>`).join("")}
     </div>`;
-  });
+    const day = plan.days[progressPanelDayIndex];
+    const exList = day.exercises || [];
+    if(!progressPanelExercise || !exList.some(e => e.name === progressPanelExercise)){
+      progressPanelExercise = exList.length ? exList[0].name : null;
+    }
+    html += `<div class="day-card" style="margin-top:10px;">
+      <div class="day-card-head"><h4 style="margin:0;">${day.name}</h4></div>`;
+    exList.forEach(ex => {
+      const lib = findExerciseByName(ex.name);
+      const imgUrl = lib ? exerciseImgUrl(lib.id) : "";
+      const isSel = ex.name === progressPanelExercise;
+      html += `<div class="ex-row" data-ppex="${escapeAttr(ex.name)}" style="cursor:pointer;${isSel?'outline:2px solid var(--accent,#ff5a2e);border-radius:10px;':''}">
+        <div class="ex-thumb" ${imgUrl ? `style="background-image:url('${imgUrl}')"` : ""}></div>
+        <div>${ex.name}</div>
+      </div>`;
+    });
+    html += `</div>`;
+
+    // Modo "día": elegir cuál de las fechas registradas para ese día usar
+    // (si no, se usa siempre la más reciente).
+    let daySessionsForPicker = [];
+    if(progressPanelMode === "dia"){
+      daySessionsForPicker = state.sessions.filter(s => s.dayName === day.name).sort((a,b)=> new Date(b.date) - new Date(a.date));
+      if(daySessionsForPicker.length){
+        if(!progressPanelSessionDate || !daySessionsForPicker.some(s=>s.date===progressPanelSessionDate)){
+          progressPanelSessionDate = daySessionsForPicker[0].date;
+        }
+        html += `<label style="margin-top:12px;">Fecha registrada a usar</label>
+        <div class="filter-row" style="margin-top:4px;flex-wrap:wrap;">
+          ${daySessionsForPicker.map(s => `<button data-ppsd="${escapeAttr(s.date)}" class="${s.date===progressPanelSessionDate?'active':''}">${new Date(s.date).toLocaleDateString("es-ES")}</button>`).join("")}
+        </div>`;
+      } else {
+        progressPanelSessionDate = null;
+      }
+    }
+
+    const savedEmail = (userProfile && userProfile.progressEmail && userProfile.progressEmail.email) || "";
+    html += `<div class="copy-row" style="margin-top:12px;">
+      <input type="email" id="progressPanelDayEmailTo" placeholder="tu-email@ejemplo.com" value="${escapeAttr(savedEmail)}" style="margin-bottom:0;">
+      <button id="btnSendDayEmailSelf">Enviarme este informe ahora</button>
+    </div>
+    <div class="msg" id="progressPanelDayEmailMsg"></div>`;
+    html += `<div id="progressPanelExerciseBody"></div>`;
+  } else {
+    // Modo individual: cualquier ejercicio registrado alguna vez, con
+    // control de intervalo y de alcance (solo ese día vs semana completa).
+    const exerciseNames = [...new Set(state.sessions.flatMap(s => s.exercises.map(e => e.name)))];
+    if(exerciseNames.length === 0){
+      html += `<div class="empty"><div>Todavía no tienes ejercicios registrados.</div></div>`;
+      main.innerHTML = html;
+      wireProgressViewTabs();
+      wireProgressEmailCard();
+      wireAiAnalyzeButton();
+      wireProgressPanelModeTabs();
+      return;
+    }
+    if(!progressPanelExercise || !exerciseNames.includes(progressPanelExercise)){
+      progressPanelExercise = exerciseNames[0];
+    }
+    html += `<label style="margin-top:12px;">Ejercicio</label>
+      <select id="progressPanelExerciseSelect">${exerciseNames.map(n => `<option value="${escapeAttr(n)}" ${n===progressPanelExercise?"selected":""}>${n}</option>`).join("")}</select>`;
+    html += `<div class="filter-row" style="margin-top:10px;">
+      <button data-pps="dia" class="${progressPanelScope==='dia'?'active':''}">Rutina diaria (solo un día)</button>
+      <button data-pps="semana" class="${progressPanelScope==='semana'?'active':''}">Rutina semanal completa</button>
+    </div>`;
+    if(progressPanelScope === "dia"){
+      const dayNames = getExerciseDayNames(progressPanelExercise);
+      html += `<div class="filter-row" style="margin-top:6px;flex-wrap:wrap;">
+        ${dayNames.map(d => `<button data-ppdn="${escapeAttr(d)}" class="${d===progressPanelDayName?'active':''}">${d}</button>`).join("")}
+      </div>`;
+    }
+    html += `<div class="filter-row" style="margin-top:6px;">
+      <button data-ppr="7" class="${progressPanelRangeDays===7?'active':''}">7 días</button>
+      <button data-ppr="30" class="${progressPanelRangeDays===30?'active':''}">30 días</button>
+      <button data-ppr="90" class="${progressPanelRangeDays===90?'active':''}">90 días</button>
+      <button data-ppr="all" class="${progressPanelRangeDays==null?'active':''}">Todo</button>
+    </div>`;
+    html += `<div id="progressPanelExerciseBody"></div>`;
+  }
+
   main.innerHTML = html;
   wireProgressViewTabs();
   wireProgressEmailCard();
   wireAiAnalyzeButton();
-  wireProgressSearch();
-  main.querySelectorAll("[data-cm]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{ progressChartMode = btn.dataset.cm; renderProgress(); });
+  wireProgressPanelModeTabs();
+
+  if(progressPanelMode === "dia" || progressPanelMode === "mensual"){
+    main.querySelectorAll("[data-ppd]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ progressPanelDayIndex = parseInt(btn.dataset.ppd,10); progressPanelExercise = null; progressPanelSessionDate = null; renderProgress(); });
+    });
+    main.querySelectorAll("[data-ppex]").forEach(row=>{
+      row.addEventListener("click", ()=>{ progressPanelExercise = row.dataset.ppex; renderProgress(); });
+    });
+    main.querySelectorAll("[data-ppsd]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ progressPanelSessionDate = btn.dataset.ppsd; renderProgress(); });
+    });
+    const dayEmailBtn = document.getElementById("btnSendDayEmailSelf");
+    if(dayEmailBtn){
+      dayEmailBtn.addEventListener("click", async () => {
+        const msg = document.getElementById("progressPanelDayEmailMsg");
+        const to = document.getElementById("progressPanelDayEmailTo").value.trim();
+        if(!to){ msg.textContent = "Escribe a qué email quieres enviarlo."; msg.style.color = "var(--down)"; return; }
+        dayEmailBtn.disabled = true; dayEmailBtn.textContent = "Enviando…";
+        try{
+          await apiFetch("/send-day-chart-email", { method:"POST", body: JSON.stringify({ dayName: plan.days[progressPanelDayIndex].name, to, sessionDate: progressPanelMode === "dia" ? progressPanelSessionDate : null }) });
+          msg.textContent = "Enviado correctamente a " + to + ".";
+          msg.style.color = "var(--steel)";
+        }catch(e){
+          msg.textContent = "No se pudo enviar: " + e.message;
+          msg.style.color = "var(--down)";
+        } finally {
+          dayEmailBtn.disabled = false; dayEmailBtn.textContent = "Enviarme este informe ahora";
+        }
+      });
+    }
+    if(progressPanelExercise) renderProgressPanelExercise(plan);
+  } else {
+    document.getElementById("progressPanelExerciseSelect").addEventListener("change", (e) => {
+      progressPanelExercise = e.target.value;
+      progressPanelDayName = null;
+      renderProgress();
+    });
+    main.querySelectorAll("[data-pps]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ progressPanelScope = btn.dataset.pps; progressPanelDayName = null; renderProgress(); });
+    });
+    main.querySelectorAll("[data-ppdn]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ progressPanelDayName = btn.dataset.ppdn; renderProgress(); });
+    });
+    main.querySelectorAll("[data-ppr]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ progressPanelRangeDays = btn.dataset.ppr === "all" ? null : parseInt(btn.dataset.ppr,10); renderProgress(); });
+    });
+    renderProgressPanelExercise(plan);
+  }
+}
+
+function wireProgressPanelModeTabs(){
+  document.querySelectorAll("[data-ppm]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      progressPanelMode = btn.dataset.ppm;
+      progressPanelExercise = null;
+      progressPanelDayName = null;
+      progressPanelSessionDate = null;
+      renderProgress();
+    });
   });
-  main.querySelectorAll("[data-rd]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{ progressRangeDays = btn.dataset.rd === "all" ? null : parseInt(btn.dataset.rd,10); renderProgress(); });
-  });
-  main.querySelectorAll(".filter-row button[data-w]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{ progressWindow = btn.dataset.w; renderProgress(); });
-  });
+}
+
+function renderProgressPanelExercise(plan){
+  const exBody = document.getElementById("progressPanelExerciseBody");
+  if(!exBody) return;
+  const name = progressPanelExercise;
+  const lib = findExerciseByName(name);
+  const expected = computeExpectedMax(name);
+  const muscleLabel = lib ? (lib.sub ? `${lib.muscle} — ${lib.sub}` : lib.muscle) : "";
+  const imgUrl = lib ? exerciseImgUrl(lib.id) : "";
+
+  let chartHtml, chartLabel;
+  if(progressPanelMode === "mensual"){
+    const dayName = plan ? plan.days[progressPanelDayIndex].name : null;
+    const monthlyPoints = buildExerciseMonthlyPoints(name, { dayName });
+    chartHtml = buildSetChartSvg(monthlyPoints, expected, "Necesitas al menos 2 meses con datos de este ejercicio para ver la gráfica mensual.", "big-chart");
+    chartLabel = "Evolución mensual (máximo por mes)";
+  } else if(progressPanelMode === "dia"){
+    const dayName = plan ? plan.days[progressPanelDayIndex].name : null;
+    const points = buildExerciseSetPoints(name, { dayName });
+    chartHtml = buildSetChartSvg(points, expected, "Necesitas al menos 2 series registradas de este ejercicio en este día para ver la gráfica.", "big-chart");
+    chartLabel = "Evolución por serie en este día (kg y repeticiones)";
+  } else {
+    const dayName = (progressPanelScope === "dia") ? progressPanelDayName : null;
+    const points = buildExerciseSetPoints(name, { dayName, rangeDays: progressPanelRangeDays });
+    chartHtml = buildSetChartSvg(points, expected, "Necesitas al menos 2 series registradas con estos filtros para ver la gráfica.", "big-chart");
+    chartLabel = "Evolución por serie (kg y repeticiones)";
+  }
+
+  let html = `<div class="exercise-big-card">
+    <div class="ex-thumb lg" ${imgUrl ? `style="background-image:url('${imgUrl}')"` : ""}></div>
+    <div>
+      <h3>${name}</h3>
+      ${muscleLabel ? `<span class="muscle-tag">${muscleLabel}</span>` : ""}
+    </div>
+  </div>`;
+  html += `<div class="m-label" style="margin:8px 0 6px;">${chartLabel}${expected!=null ? ' · con expectativa para tu experiencia' : ''}</div>`;
+  html += chartHtml;
+
+  // Igual que en el admin: el envío de este ejercicio suelto solo tiene
+  // sentido en modo "Individual por ejercicio" (en "Por día"/"Mensual" ya
+  // está el botón de "Enviarme este informe ahora" encima).
+  const showExerciseEmailBox = progressPanelMode === "individual";
+  if(showExerciseEmailBox){
+    const savedEmail = (userProfile && userProfile.progressEmail && userProfile.progressEmail.email) || "";
+    html += `<div class="copy-row" style="margin-top:14px;">
+      <input type="email" id="progressPanelEmailTo" placeholder="tu-email@ejemplo.com" value="${escapeAttr(savedEmail)}" style="margin-bottom:0;">
+      <button id="btnSendExerciseEmailSelf">Enviarme por email</button>
+    </div>
+    <div class="msg" id="progressPanelEmailMsg"></div>`;
+  }
+
+  exBody.innerHTML = html;
+
+  if(showExerciseEmailBox){
+    document.getElementById("btnSendExerciseEmailSelf").addEventListener("click", async () => {
+      const msg = document.getElementById("progressPanelEmailMsg");
+      const to = document.getElementById("progressPanelEmailTo").value.trim();
+      if(!to){ msg.textContent = "Escribe a qué email quieres enviarlo."; msg.style.color = "var(--down)"; return; }
+      const btn = document.getElementById("btnSendExerciseEmailSelf");
+      btn.disabled = true; btn.textContent = "Enviando…";
+      try{
+        await apiFetch("/send-exercise-chart-email", { method:"POST", body: JSON.stringify({ exerciseName: name, to }) });
+        msg.textContent = "Enviado correctamente a " + to + ".";
+        msg.style.color = "var(--steel)";
+      }catch(e){
+        msg.textContent = "No se pudo enviar: " + e.message;
+        msg.style.color = "var(--down)";
+      } finally {
+        btn.disabled = false; btn.textContent = "Enviarme por email";
+      }
+    });
+  }
 }
 
 // -------------------- Sub-vista: peso corporal --------------------
@@ -2648,16 +2759,6 @@ function renderWeightProgress(){
   });
 }
 
-function wireProgressSearch(){
-  const input = document.getElementById("progressSearchInput");
-  if(!input) return;
-  input.addEventListener("input", (e)=>{
-    progressSearchQuery = e.target.value;
-    renderProgress();
-    const el = document.getElementById("progressSearchInput");
-    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
-  });
-}
 
 function wireAiAnalyzeButton(){
   const btn = document.getElementById("aiAnalyzeBtn");

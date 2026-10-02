@@ -1054,7 +1054,9 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
     // ---------------------------------------------------------------
     // ADMIN: enviar por email el informe completo de un día de rutina de un
     // cliente (desde el Panel de clientes)  (POST /admin/send-day-chart-email)
-    // Header: X-Admin-Key   Body: { "username", "dayName", "to", "comment"? }
+    // Header: X-Admin-Key   Body: { "username", "dayName", "to", "comment"?, "sessionDate"? }
+    // sessionDate (opcional): fecha ISO de una sesión concreta registrada para
+    // ese día de rutina; si no se indica, se usa la más reciente.
     // ---------------------------------------------------------------
     if (path === "/admin/send-day-chart-email" && request.method === "POST") {
       const adminKey = request.headers.get("X-Admin-Key") || "";
@@ -1065,6 +1067,7 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       const dayName = String(body.dayName || "").trim();
       const to = String(body.to || "").trim();
       const comment = String(body.comment || "").trim();
+      const sessionDate = body.sessionDate ? String(body.sessionDate).trim() : null;
       if (!username) return err("Usuario inválido.");
       if (!dayName) return err("Falta el día de rutina.");
       if (!to) return err("Indica a qué email quieres enviarlo.");
@@ -1074,8 +1077,67 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       const data = JSON.parse(dataRaw);
 
       try {
-        const html = buildDayReportEmailHtml(username, data, dayName, comment);
+        const html = buildDayReportEmailHtml(username, data, dayName, comment, sessionDate);
         await sendEmailViaResend(env, to, `Informe de entrenamiento — ${dayName} (${username})`, html);
+        return json({ ok: true, to });
+      } catch (e) {
+        return err("No se pudo enviar: " + e.message, 502);
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // CLIENTE: enviarse a sí mismo por email la gráfica de un ejercicio
+    // concreto (desde la pestaña Progreso)  (POST /send-exercise-chart-email)
+    // Header: Authorization: Bearer <token>   Body: { "exerciseName", "to" }
+    // ---------------------------------------------------------------
+    if (path === "/send-exercise-chart-email" && request.method === "POST") {
+      const username = await getUserFromToken(env, request);
+      if (!username) return err("No autenticado.", 401);
+
+      const body = await request.json().catch(() => ({}));
+      const exerciseName = String(body.exerciseName || "").trim();
+      const to = String(body.to || "").trim();
+      if (!exerciseName) return err("Falta el ejercicio.");
+      if (!to) return err("Indica a qué email quieres enviarlo.");
+
+      const dataRaw = await env.ADEANFIT_KV.get("data:" + username);
+      if (!dataRaw) return err("No se encontraron tus datos.", 404);
+      const data = JSON.parse(dataRaw);
+
+      try {
+        const html = buildExerciseChartEmailHtml(username, data, exerciseName);
+        await sendEmailViaResend(env, to, `Tu progreso — ${exerciseName}`, html);
+        return json({ ok: true, to });
+      } catch (e) {
+        return err("No se pudo enviar: " + e.message, 502);
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // CLIENTE: enviarse a sí mismo por email el informe completo de un día
+    // de rutina (desde la pestaña Progreso)  (POST /send-day-chart-email)
+    // Header: Authorization: Bearer <token>
+    // Body: { "dayName", "to", "sessionDate"? }
+    // (Sin comentario de entrenador: esta vía es solo para el propio cliente.)
+    // ---------------------------------------------------------------
+    if (path === "/send-day-chart-email" && request.method === "POST") {
+      const username = await getUserFromToken(env, request);
+      if (!username) return err("No autenticado.", 401);
+
+      const body = await request.json().catch(() => ({}));
+      const dayName = String(body.dayName || "").trim();
+      const to = String(body.to || "").trim();
+      const sessionDate = body.sessionDate ? String(body.sessionDate).trim() : null;
+      if (!dayName) return err("Falta el día de rutina.");
+      if (!to) return err("Indica a qué email quieres enviarlo.");
+
+      const dataRaw = await env.ADEANFIT_KV.get("data:" + username);
+      if (!dataRaw) return err("No se encontraron tus datos.", 404);
+      const data = JSON.parse(dataRaw);
+
+      try {
+        const html = buildDayReportEmailHtml(username, data, dayName, "", sessionDate);
+        await sendEmailViaResend(env, to, `Tu informe de entrenamiento — ${dayName}`, html);
         return json({ ok: true, to });
       } catch (e) {
         return err("No se pudo enviar: " + e.message, 502);
@@ -1359,39 +1421,60 @@ function shortDMYEmail(iso) {
   return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
-// Gráfico de barras pareadas (Esperado en gris, Real en verde si cumple/supera
-// el objetivo u naranja si se queda corto) — una pareja de barras por serie.
+// Cada ejercicio recibe su propio tono de naranja (todas sus series comparten
+// ese mismo tono), y el tono cambia de un ejercicio a otro para distinguirlos
+// a simple vista sin salirse de la paleta naranja de la app.
+function orangeShadeForIndex(idx) {
+  const lightness = 46 + (idx % 6) * 7; // 46%-81%, recorre varios tonos de naranja
+  return `hsl(22, 92%, ${lightness}%)`;
+}
+function dayExerciseColorMap(setRows) {
+  const names = [];
+  setRows.forEach(r => { if (!names.includes(r.exerciseName)) names.push(r.exerciseName); });
+  const map = {};
+  names.forEach((n, i) => { map[n] = orangeShadeForIndex(i); });
+  return map;
+}
+
+// Gráfico de barras pareadas (Sombra esperada en naranja translúcido, Carga
+// real en el tono de naranja de cada ejercicio) — una pareja de barras por
+// serie. El ancho de la imagen crece con el número de series para que
+// ninguna barra quede aplastada o invisible cuando hay muchos
+// ejercicios/series en la sesión.
 function dayBarChartImgTag(setRows) {
   const withExpected = setRows.filter(r => r.expected != null);
   if (withExpected.length === 0) return "";
   const labels = setRows.map(r => `${r.shortName} S${r.setNum}`);
-  const realColors = setRows.map(r => r.expected == null ? "#5b8def" : (r.kg >= r.expected ? "#34c579" : "#ff5a2e"));
+  const width = Math.min(1400, Math.max(600, setRows.length * 55));
+  const colorMap = dayExerciseColorMap(setRows);
+  const realColors = setRows.map(r => colorMap[r.exerciseName]);
   const config = {
     type: "bar",
     data: {
       labels,
       datasets: [
-        { label: "Sombra esperada", data: setRows.map(r => r.expected), backgroundColor: "rgba(170,170,170,0.35)" },
+        { label: "Sombra esperada", data: setRows.map(r => r.expected), backgroundColor: "rgba(255,122,61,0.30)" },
         { label: "Carga real", data: setRows.map(r => r.kg), backgroundColor: realColors },
       ],
     },
     options: {
       plugins: { legend: { display: true, labels: { color: "#ccc" } } },
       scales: {
-        x: { ticks: { color: "#ccc", font: { size: 9 } }, grid: { display: false } },
-        y: { ticks: { color: "#ccc" }, grid: { color: "#2a2a2c" } },
+        x: { ticks: { color: "#ccc", font: { size: 9 }, autoSkip: false, maxRotation: 60, minRotation: 0 }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: "#ccc" }, grid: { color: "#2a2a2c" } },
       },
     },
   };
-  const url = quickChartUrl(config, 600, 260);
-  return `<img src="${url}" width="600" height="260" alt="Comparativa de carga real vs. esperada" style="width:100%;max-width:600px;border-radius:8px;margin:10px 0 16px;">`;
+  const url = quickChartUrl(config, width, 280);
+  return `<img src="${url}" width="${width}" height="280" alt="Comparativa de carga real vs. esperada" style="width:100%;max-width:${width}px;border-radius:8px;margin:10px 0 16px;">`;
 }
 
 // Informe completo de UNA sesión (un día de rutina) — misma estructura que el
 // informe de referencia: KPIs, gráfico de barras esperado vs. real por serie,
-// tabla de desglose completo, y comentario opcional del entrenador. Usa la
-// sesión más reciente registrada para ese día de rutina.
-function buildDayReportEmailHtml(username, data, dayName, comment) {
+// tabla de desglose completo, y comentario opcional del entrenador. Si se
+// indica sessionDate, usa esa fecha concreta registrada para ese día de
+// rutina; si no, usa la sesión más reciente.
+function buildDayReportEmailHtml(username, data, dayName, comment, sessionDate) {
   const profile = data.profile || {};
   const sessions = (data.state && data.state.sessions) || [];
   const daySessions = sessions.filter(s => s.dayName === dayName).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -1403,7 +1486,7 @@ function buildDayReportEmailHtml(username, data, dayName, comment) {
       <p style="font-size:14px;color:#bbb;">Todavía no hay ninguna sesión registrada para "${escapeHtmlEmail(dayName)}".</p>
     </div>`;
   }
-  const session = daySessions[0];
+  const session = (sessionDate && daySessions.find(s => s.date === sessionDate)) || daySessions[0];
 
   const setRows = [];
   (session.exercises || []).forEach(ex => {
@@ -1415,7 +1498,7 @@ function buildDayReportEmailHtml(username, data, dayName, comment) {
     });
   });
 
-  const totalVolume = setRows.reduce((sum, r) => sum + r.kg * r.reps, 0);
+  const totalKg = setRows.reduce((sum, r) => sum + r.kg, 0);
   const withExpected = setRows.filter(r => r.expected != null);
   const sumReal = withExpected.reduce((s, r) => s + r.kg, 0);
   const sumExpected = withExpected.reduce((s, r) => s + r.expected, 0);
@@ -1426,8 +1509,8 @@ function buildDayReportEmailHtml(username, data, dayName, comment) {
     <div style="display:flex;flex-wrap:wrap;gap:10px;margin:14px 0;">
       <div style="flex:1;min-width:130px;background:#1f1f22;border-radius:10px;padding:12px 14px;">
         <div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.03em;">Carga total</div>
-        <div style="font-size:19px;font-weight:700;margin-top:2px;">${Math.round(totalVolume).toLocaleString("es-ES")} kg</div>
-        <div style="font-size:11px;color:#777;">Volumen de trabajo</div>
+        <div style="font-size:19px;font-weight:700;margin-top:2px;">${Math.round(totalKg).toLocaleString("es-ES")} kg</div>
+        <div style="font-size:11px;color:#777;">Suma del peso marcado por serie</div>
       </div>
       ${rendimientoPct != null ? `
       <div style="flex:1;min-width:130px;background:#1f1f22;border-radius:10px;padding:12px 14px;">
