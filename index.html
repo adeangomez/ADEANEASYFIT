@@ -11,8 +11,8 @@
 <meta name="apple-mobile-web-app-title" content="Rutina" />
 <meta name="mobile-web-app-capable" content="yes" />
 <title>Rutina — Circuito de entreno</title>
-<link rel="apple-touch-icon" href="https://adeangomez.github.io/adeaneasyfit/assets/icon.png">
-<link rel="icon" type="image/png" href="https://adeangomez.github.io/adeaneasyfit/assets/icon.png">
+<link rel="apple-touch-icon" href="https://adeangomez.github.io/ADEANEASYFIT/assets/icon.png">
+<link rel="icon" type="image/png" href="https://adeangomez.github.io/ADEANEASYFIT/assets/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -462,7 +462,7 @@ const DEFAULT_DAYS_SEED = [
 // y son los únicos que la IA puede usar al generar rutinas. Las imágenes
 // viven en el repositorio (assets/ejercicios/) para no hinchar la app.
 // -------------------------------------------------------------------------
-const ASSETS_BASE = "https://adeangomez.github.io/adeaneasyfit/assets/ejercicios/";
+const ASSETS_BASE = "https://adeangomez.github.io/ADEANEASYFIT/assets/ejercicios/";
 const EXERCISE_LIBRARY = [
   { id: "aperturas-pecho-maquina",     name: "Aperturas de pecho en máquina", muscle: "Pecho" },
   { id: "aperturas-pecho-poleas",      name: "Aperturas de pecho en poleas",  muscle: "Pecho" },
@@ -566,7 +566,7 @@ const CARDIO_LIBRARY = [
   { id: "eliptica",            name: "Elíptica" },
   { id: "maquina-de-escaleras", name: "Máquina de escaleras" },
 ];
-const CARDIO_ASSETS_BASE = "https://adeangomez.github.io/adeaneasyfit/assets/cardio/";
+const CARDIO_ASSETS_BASE = "https://adeangomez.github.io/ADEANEASYFIT/assets/cardio/";
 function cardioImgUrl(id){ return CARDIO_ASSETS_BASE + id + ".png"; }
 
 function cardioSessionsInRange(days){
@@ -1064,7 +1064,7 @@ function onboardingScreenHtml(){
   const optionsHtml = TIME_BRACKETS.map(b => `<option value="${b.id}">${b.label}</option>`).join("");
   return `
     <div class="auth-wrap">
-      <img class="auth-logo" src="https://adeangomez.github.io/adeaneasyfit/assets/icon.png" alt="Adeanfit">
+      <img class="auth-logo" src="https://adeangomez.github.io/ADEANEASYFIT/assets/icon.png" alt="Adeanfit">
       <h1 class="auth-title display">ANTES DE EMPEZAR</h1>
       <div class="auth-sub">Necesitamos estos datos para poder comparar tu progreso con la evolución esperada según tu experiencia. Solo se pide una vez.</div>
       <div class="auth-card">
@@ -1199,7 +1199,7 @@ function renderApp(){
 function authScreenHtml(){
   return `
     <div class="auth-wrap">
-      <img class="auth-logo" src="https://adeangomez.github.io/adeaneasyfit/assets/icon.png" alt="Adeanfit">
+      <img class="auth-logo" src="https://adeangomez.github.io/ADEANEASYFIT/assets/icon.png" alt="Adeanfit">
       <h1 class="auth-title display">ADEANFIT</h1>
       <div class="auth-sub">Circuito de entreno personal. El acceso lo gestiona el administrador — si no tienes cuenta, pídesela.</div>
       <div class="auth-card">
