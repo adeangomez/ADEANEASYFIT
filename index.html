@@ -1807,12 +1807,22 @@ function lastTimeFor(exerciseName){
 
 // Series (kg y reps) de la última sesión guardada de un ejercicio, para
 // mostrarlas como "sombra" difuminada en los campos de la sesión de hoy.
+// Para cada nº de serie se usa la sesión más reciente en la que esa serie
+// tuvo carga o repeticiones reales (las series vacías 0/0 se saltan).
 function lastSessionSetsFor(exerciseName){
+  const result = [];
+  let found = false;
   for(let i = state.sessions.length - 1; i >= 0; i--){
     const ex = state.sessions[i].exercises.find(e => e.name === exerciseName);
-    if(ex && Array.isArray(ex.sets) && ex.sets.length) return ex.sets;
+    if(!ex || !Array.isArray(ex.sets)) continue;
+    ex.sets.forEach((st, idx) => {
+      if(!result[idx] && ((st.kg || 0) > 0 || (st.reps || 0) > 0)){
+        result[idx] = st;
+        found = true;
+      }
+    });
   }
-  return null;
+  return found ? result : null;
 }
 
 function renderTrain(){
