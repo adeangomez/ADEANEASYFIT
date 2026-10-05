@@ -265,9 +265,13 @@
   .exercise-big-card h3{ margin:0 0 3px; font-size:16px; font-weight:700; }
   .exercise-big-card .muscle-tag{ font-size:10.5px; color:var(--steel); background:var(--card-2); border:1px solid var(--line-soft); border-radius:100px; padding:3px 9px; display:inline-block; }
   .ex-thumb.lg{ width:72px; height:72px; border-radius:12px; }
-  .copy-row{ display:flex; gap:8px; align-items:center; }
-  .copy-row input{ margin-bottom:0; flex:1; }
-  .copy-row button{ width:auto; flex-shrink:0; padding:11px 14px; font-size:13px; }
+  .copy-row{ display:flex; gap:8px; align-items:stretch; }
+  .copy-row input{ flex:1; min-width:0; background:var(--card); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:12px 14px; font-size:14.5px; font-family:'Inter'; }
+  .copy-row input::placeholder{ color:var(--text-faint); }
+  .copy-row input:focus{ outline:none; border-color:var(--iron); }
+  .copy-row button{ width:auto; flex-shrink:0; background:var(--iron); color:#1a0b06; border:none; border-radius:10px; padding:0 18px; font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em; cursor:pointer; transition:background .15s; }
+  .copy-row button:hover{ background:var(--iron-hover); }
+  .copy-row button:disabled{ opacity:.6; cursor:default; }
 
   .pp-step{ font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint); margin:16px 2px 8px; }
   .pp-list{ max-height:300px; overflow-y:auto; background:var(--card-2); border:1px solid var(--line-soft); border-radius:12px; padding:4px; }
