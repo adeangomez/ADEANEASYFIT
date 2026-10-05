@@ -269,6 +269,12 @@
   .copy-row input{ margin-bottom:0; flex:1; }
   .copy-row button{ width:auto; flex-shrink:0; padding:11px 14px; font-size:13px; }
 
+  .pp-step{ font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint); margin:16px 2px 8px; }
+  .pp-list{ max-height:300px; overflow-y:auto; background:var(--card-2); border:1px solid var(--line-soft); border-radius:12px; padding:4px; }
+  .pp-row{ display:flex; align-items:center; gap:12px; padding:8px; border-radius:10px; cursor:pointer; font-size:13.5px; font-weight:600; }
+  .pp-row.sel{ outline:2px solid var(--iron); background:var(--iron-dim); }
+  .pp-row .ex-thumb{ width:50px; height:50px; border:1px solid var(--line-soft); }
+
   /* IA */
   .ai-card{ margin-bottom:16px; }
   .ai-result{ margin-top:12px; background: var(--card); border:1px solid var(--line-soft); border-radius: var(--radius); padding:14px 16px; font-size:13.5px; line-height:1.6; color:var(--text-dim); }
@@ -611,13 +617,13 @@ let plans = [];            // [{id, name, createdAt, days:[{name, sub, exercises
 let activePlanId = null;
 let activeTab = "train";
 let progressView = "carga";       // "carga" (progreso de peso levantado) | "peso" (peso corporal)
-let progressPanelMode = "dia";       // "dia" | "mensual" | "individual" (igual que el Panel de clientes del admin)
+let progressPanelMode = "dia";       // "dia" | "rutina" | "ejercicio"
 let progressPanelDayIndex = 0;
-let progressPanelSessionDate = null; // (modo "dia") fecha concreta elegida entre las sesiones registradas para ese día; null = la más reciente
+let progressPanelSessionDate = null; // fecha elegida para el informe del día; null = la más reciente
 let progressPanelExercise = null;
-let progressPanelScope = "dia";      // (modo individual) "dia" | "semana"
-let progressPanelDayName = null;     // (modo individual, alcance "dia") día elegido para filtrar
-let progressPanelRangeDays = null;   // (modo individual) null=todo, o 7/30/90
+let progressPanelSearch = "";
+let progressPanelChartView = "series"; // "series" | "mensual"
+let progressPanelRangeDays = null;   // null = todo, o 7/30/90
 let weightChartRange = "absolute"; // "month" | "quarter" | "semester" | "year" | "absolute"
 let userProfile = null; // { weightKg, heightCm, timeTraining, updatedAt }
 let weightReminderDismissed = false;
@@ -2446,11 +2452,35 @@ function wireProgressEmailCard(){
 }
 
 // -------------------- Sub-vista: progreso de carga (peso levantado por ejercicio) --------------------
-// Panel de progreso de carga: mismo esquema que el Panel de clientes del
-// admin (Por día / Mensual / Individual por ejercicio), pero para el propio
-// cliente — sin comentario de entrenador, con la opción de mandarse el
-// informe al momento, y sin perder la preferencia de envío periódico ya
-// existente (arriba del todo, en progressEmailCardHtml()).
+// Panel de progreso de carga. Un solo flujo, de arriba abajo:
+//  1) elegir QUÉ ver: Día de rutina / Rutina completa / Ejercicio (buscador)
+//  2) elegir el ejercicio de la lista (con foto)
+//  3) ajustar el gráfico (por serie o mensual, y el intervalo)
+//  4) enviar por correo (informe del día completo o gráfico del ejercicio)
+// La preferencia de envío periódico sigue arriba (progressEmailCardHtml()).
+function ppExerciseNamesForMode(plan){
+  if(progressPanelMode === "dia"){
+    const day = plan && plan.days ? plan.days[progressPanelDayIndex] : null;
+    return day ? (day.exercises || []).map(e => e.name) : [];
+  }
+  if(progressPanelMode === "rutina"){
+    const out = [];
+    ((plan && plan.days) || []).forEach(d => (d.exercises || []).forEach(e => { if(!out.includes(e.name)) out.push(e.name); }));
+    return out;
+  }
+  const logged = [...new Set(state.sessions.flatMap(s => s.exercises.map(e => e.name)))].sort((a,b)=> a.localeCompare(b));
+  const q = normalizeText(progressPanelSearch || "");
+  return q ? logged.filter(n => normalizeText(n).includes(q)) : logged;
+}
+function ppRowsHtml(names){
+  if(names.length === 0) return `<div class="chart-empty" style="padding:14px 4px;">No hay ejercicios que coincidan.</div>`;
+  return names.map(n => {
+    const lib = findExerciseByName(n);
+    const img = lib ? `<img class="ex-thumb" src="${exerciseImgUrl(lib.id)}" alt="" loading="lazy">` : `<span class="ex-thumb ex-thumb-empty">?</span>`;
+    return `<div class="pp-row ${n===progressPanelExercise?'sel':''}" data-ppex="${escapeAttr(n)}">${img}<span>${n}</span></div>`;
+  }).join("");
+}
+
 function renderStrengthProgress(){
   const main = document.getElementById("main");
   let html = progressViewTabsHtml();
@@ -2462,253 +2492,161 @@ function renderStrengthProgress(){
       <div id="aiAnalyzeResult"></div>
     </div>
   `;
+  const finishWiring = () => { wireProgressViewTabs(); wireProgressEmailCard(); wireAiAnalyzeButton(); };
   if(state.sessions.length === 0){
     html += `<div class="empty"><div class="empty-icon">${ICON_PROGRESS}</div>
       <div>Todavía no hay sesiones guardadas.<br>Completa tu primer entrenamiento en la pestaña <b>Entrenar</b> para empezar a ver tu evolución.</div></div>`;
-    main.innerHTML = html;
-    wireProgressViewTabs();
-    wireProgressEmailCard();
-    wireAiAnalyzeButton();
-    return;
+    main.innerHTML = html; finishWiring(); return;
   }
 
-  html += `<div class="filter-row" style="margin-top:14px;">
-    <button data-ppm="dia" class="${progressPanelMode==='dia'?'active':''}">Por día</button>
-    <button data-ppm="mensual" class="${progressPanelMode==='mensual'?'active':''}">Ejercicio</button>
-    <button data-ppm="individual" class="${progressPanelMode==='individual'?'active':''}">Individual por ejercicio</button>
-  </div>`;
-
   const plan = activePlan();
+  const hasPlan = !!(plan && plan.days && plan.days.length);
+  if(!hasPlan && progressPanelMode !== "ejercicio") progressPanelMode = "ejercicio";
+  if(hasPlan && progressPanelDayIndex >= plan.days.length) progressPanelDayIndex = 0;
 
-  if(progressPanelMode === "dia" || progressPanelMode === "mensual"){
-    if(!plan || !plan.days || plan.days.length === 0){
-      html += `<div class="empty"><div>Todavía no tienes una rutina asignada.</div></div>`;
-      main.innerHTML = html;
-      wireProgressViewTabs();
-      wireProgressEmailCard();
-      wireAiAnalyzeButton();
-      wireProgressPanelModeTabs();
-      return;
-    }
-    if(progressPanelDayIndex >= plan.days.length) progressPanelDayIndex = 0;
-    html += `<div class="filter-row" style="margin-top:10px;flex-wrap:wrap;">
-      ${plan.days.map((d,i) => `<button data-ppd="${i}" class="${i===progressPanelDayIndex?'active':''}">${i+1}. ${d.name}</button>`).join("")}
+  // 1) Qué quiero ver
+  html += `<div class="pp-step">1 · ¿Qué quieres ver?</div>
+  <div class="filter-row" style="margin-bottom:8px;">
+    ${hasPlan ? `<button data-ppm="dia" class="${progressPanelMode==='dia'?'active':''}">Día de rutina</button>
+    <button data-ppm="rutina" class="${progressPanelMode==='rutina'?'active':''}">Rutina completa</button>` : ``}
+    <button data-ppm="ejercicio" class="${progressPanelMode==='ejercicio'?'active':''}">Ejercicio</button>
+  </div>`;
+  if(progressPanelMode === "dia"){
+    html += `<div class="filter-row" style="flex-wrap:wrap;margin-bottom:8px;">
+      ${plan.days.map((d,i) => `<button data-ppd="${i}" class="${i===progressPanelDayIndex?'active':''}">${d.name}</button>`).join("")}
     </div>`;
-    const day = plan.days[progressPanelDayIndex];
-    const exList = day.exercises || [];
-    if(!progressPanelExercise || !exList.some(e => e.name === progressPanelExercise)){
-      progressPanelExercise = exList.length ? exList[0].name : null;
-    }
-    html += `<div class="day-card" style="margin-top:10px;">
-      <div class="day-card-head"><h4 style="margin:0;">${day.name}</h4></div>`;
-    exList.forEach(ex => {
-      const lib = findExerciseByName(ex.name);
-      const imgUrl = lib ? exerciseImgUrl(lib.id) : "";
-      const isSel = ex.name === progressPanelExercise;
-      html += `<div class="ex-row" data-ppex="${escapeAttr(ex.name)}" style="cursor:pointer;${isSel?'outline:2px solid var(--accent,#ff5a2e);border-radius:10px;':''}">
-        <div class="ex-thumb" ${imgUrl ? `style="background-image:url('${imgUrl}')"` : ""}></div>
-        <div>${ex.name}</div>
-      </div>`;
+  }
+  if(progressPanelMode === "ejercicio"){
+    html += `<input type="text" id="ppSearch" class="ex-search-input" placeholder="Buscar ejercicio…" value="${escapeAttr(progressPanelSearch)}" style="margin-bottom:8px;">`;
+  }
+
+  // 2) Ejercicio
+  const names = ppExerciseNamesForMode(plan);
+  if(!progressPanelExercise || !names.includes(progressPanelExercise)){
+    progressPanelExercise = names.length ? names[0] : null;
+  }
+  html += `<div class="pp-step">2 · Elige el ejercicio</div><div class="pp-list" id="ppList">${ppRowsHtml(names)}</div>`;
+  html += `<div id="ppDetail"></div>`;
+
+  main.innerHTML = html;
+  finishWiring();
+
+  main.querySelectorAll("[data-ppm]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ progressPanelMode = btn.dataset.ppm; progressPanelExercise = null; progressPanelSessionDate = null; renderProgress(); });
+  });
+  main.querySelectorAll("[data-ppd]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ progressPanelDayIndex = parseInt(btn.dataset.ppd,10); progressPanelExercise = null; progressPanelSessionDate = null; renderProgress(); });
+  });
+  const list = document.getElementById("ppList");
+  const wireRows = () => {
+    list.querySelectorAll("[data-ppex]").forEach(row=>{
+      row.addEventListener("click", ()=>{
+        progressPanelExercise = row.dataset.ppex;
+        list.querySelectorAll(".pp-row").forEach(r => r.classList.toggle("sel", r === row));
+        renderProgressPanelDetail(plan);
+      });
     });
-    html += `</div>`;
+  };
+  wireRows();
+  const search = document.getElementById("ppSearch");
+  if(search){
+    search.addEventListener("input", (e)=>{
+      progressPanelSearch = e.target.value;
+      const filtered = ppExerciseNamesForMode(plan);
+      if(!filtered.includes(progressPanelExercise)) progressPanelExercise = filtered.length ? filtered[0] : null;
+      list.innerHTML = ppRowsHtml(filtered);
+      wireRows();
+      renderProgressPanelDetail(plan);
+    });
+  }
+  renderProgressPanelDetail(plan);
+}
 
-    // Modo "día": elegir cuál de las fechas registradas para ese día usar
-    // (si no, se usa siempre la más reciente).
-    let daySessionsForPicker = [];
-    if(progressPanelMode === "dia"){
-      daySessionsForPicker = state.sessions.filter(s => s.dayName === day.name).sort((a,b)=> new Date(b.date) - new Date(a.date));
-      if(daySessionsForPicker.length){
-        if(!progressPanelSessionDate || !daySessionsForPicker.some(s=>s.date===progressPanelSessionDate)){
-          progressPanelSessionDate = daySessionsForPicker[0].date;
-        }
-        html += `<label style="margin-top:12px;">Fecha registrada a usar</label>
-        <div class="filter-row" style="margin-top:4px;flex-wrap:wrap;">
-          ${daySessionsForPicker.map(s => `<button data-ppsd="${escapeAttr(s.date)}" class="${s.date===progressPanelSessionDate?'active':''}">${new Date(s.date).toLocaleDateString("es-ES")}</button>`).join("")}
-        </div>`;
-      } else {
-        progressPanelSessionDate = null;
-      }
-    }
+// Pasos 3 y 4: gráfico del ejercicio elegido + envío por correo.
+function renderProgressPanelDetail(plan){
+  const box = document.getElementById("ppDetail");
+  if(!box) return;
+  const name = progressPanelExercise;
+  if(!name){ box.innerHTML = ""; return; }
+  const lib = findExerciseByName(name);
+  const expected = computeExpectedMax(name);
+  const muscleLabel = lib ? (lib.sub ? `${lib.muscle} — ${lib.sub}` : lib.muscle) : "";
+  const dayName = (progressPanelMode === "dia" && plan) ? plan.days[progressPanelDayIndex].name : null;
 
-    const savedEmail = (userProfile && userProfile.progressEmail && userProfile.progressEmail.email) || "";
-    html += `<div class="copy-row" style="margin-top:12px;">
-      <input type="email" id="progressPanelDayEmailTo" placeholder="tu-email@ejemplo.com" value="${escapeAttr(savedEmail)}" style="margin-bottom:0;">
-      <button id="btnSendDayEmailSelf">Enviarme este informe ahora</button>
-    </div>
-    <div class="msg" id="progressPanelDayEmailMsg"></div>`;
-    html += `<div id="progressPanelExerciseBody"></div>`;
+  let chartHtml;
+  if(progressPanelChartView === "mensual"){
+    chartHtml = buildSetChartSvg(buildExerciseMonthlyPoints(name, { dayName }), expected, "Necesitas al menos 2 meses con datos de este ejercicio para ver la gráfica mensual.", "big-chart");
   } else {
-    // Modo individual: cualquier ejercicio registrado alguna vez, con
-    // control de intervalo y de alcance (solo ese día vs semana completa).
-    const exerciseNames = [...new Set(state.sessions.flatMap(s => s.exercises.map(e => e.name)))];
-    if(exerciseNames.length === 0){
-      html += `<div class="empty"><div>Todavía no tienes ejercicios registrados.</div></div>`;
-      main.innerHTML = html;
-      wireProgressViewTabs();
-      wireProgressEmailCard();
-      wireAiAnalyzeButton();
-      wireProgressPanelModeTabs();
-      return;
-    }
-    if(!progressPanelExercise || !exerciseNames.includes(progressPanelExercise)){
-      progressPanelExercise = exerciseNames[0];
-    }
-    html += `<label style="margin-top:12px;">Ejercicio</label>
-      <select id="progressPanelExerciseSelect">${exerciseNames.map(n => `<option value="${escapeAttr(n)}" ${n===progressPanelExercise?"selected":""}>${n}</option>`).join("")}</select>`;
-    html += `<div class="filter-row" style="margin-top:10px;">
-      <button data-pps="dia" class="${progressPanelScope==='dia'?'active':''}">Rutina diaria (solo un día)</button>
-      <button data-pps="semana" class="${progressPanelScope==='semana'?'active':''}">Rutina semanal completa</button>
-    </div>`;
-    if(progressPanelScope === "dia"){
-      const dayNames = getExerciseDayNames(progressPanelExercise);
-      html += `<div class="filter-row" style="margin-top:6px;flex-wrap:wrap;">
-        ${dayNames.map(d => `<button data-ppdn="${escapeAttr(d)}" class="${d===progressPanelDayName?'active':''}">${d}</button>`).join("")}
-      </div>`;
-    }
-    html += `<div class="filter-row" style="margin-top:6px;">
+    chartHtml = buildSetChartSvg(buildExerciseSetPoints(name, { dayName, rangeDays: progressPanelRangeDays }), expected, "Necesitas al menos 2 series registradas con estos filtros para ver la gráfica.", "big-chart");
+  }
+
+  let html = `<div class="pp-step">3 · Gráfico</div>
+  <div class="exercise-big-card">
+    ${lib ? `<img class="ex-thumb lg" src="${exerciseImgUrl(lib.id)}" alt="">` : ``}
+    <div><h3>${name}</h3>${muscleLabel ? `<span class="muscle-tag">${muscleLabel}</span>` : ""}</div>
+  </div>
+  <div class="filter-row" style="margin-bottom:8px;">
+    <button data-ppcv="series" class="${progressPanelChartView==='series'?'active':''}">Por serie</button>
+    <button data-ppcv="mensual" class="${progressPanelChartView==='mensual'?'active':''}">Mes a mes</button>
+  </div>`;
+  if(progressPanelChartView === "series"){
+    html += `<div class="filter-row" style="margin-bottom:10px;">
       <button data-ppr="7" class="${progressPanelRangeDays===7?'active':''}">7 días</button>
       <button data-ppr="30" class="${progressPanelRangeDays===30?'active':''}">30 días</button>
       <button data-ppr="90" class="${progressPanelRangeDays===90?'active':''}">90 días</button>
       <button data-ppr="all" class="${progressPanelRangeDays==null?'active':''}">Todo</button>
     </div>`;
-    html += `<div id="progressPanelExerciseBody"></div>`;
   }
+  html += `<div class="m-label" style="margin:4px 0 6px;">${progressPanelChartView==='mensual' ? 'Máximo de cada mes' : 'Cada serie registrada (kg)'}${expected!=null ? ' · línea discontinua: lo esperado para tu experiencia' : ''}</div>${chartHtml}`;
 
-  main.innerHTML = html;
-  wireProgressViewTabs();
-  wireProgressEmailCard();
-  wireAiAnalyzeButton();
-  wireProgressPanelModeTabs();
-
-  if(progressPanelMode === "dia" || progressPanelMode === "mensual"){
-    main.querySelectorAll("[data-ppd]").forEach(btn=>{
-      btn.addEventListener("click", ()=>{ progressPanelDayIndex = parseInt(btn.dataset.ppd,10); progressPanelExercise = null; progressPanelSessionDate = null; renderProgress(); });
-    });
-    main.querySelectorAll("[data-ppex]").forEach(row=>{
-      row.addEventListener("click", ()=>{ progressPanelExercise = row.dataset.ppex; renderProgress(); });
-    });
-    main.querySelectorAll("[data-ppsd]").forEach(btn=>{
-      btn.addEventListener("click", ()=>{ progressPanelSessionDate = btn.dataset.ppsd; renderProgress(); });
-    });
-    const dayEmailBtn = document.getElementById("btnSendDayEmailSelf");
-    if(dayEmailBtn){
-      dayEmailBtn.addEventListener("click", async () => {
-        const msg = document.getElementById("progressPanelDayEmailMsg");
-        const to = document.getElementById("progressPanelDayEmailTo").value.trim();
-        if(!to){ msg.textContent = "Escribe a qué email quieres enviarlo."; msg.style.color = "var(--down)"; return; }
-        dayEmailBtn.disabled = true; dayEmailBtn.textContent = "Enviando…";
-        try{
-          await apiFetch("/send-day-chart-email", { method:"POST", body: JSON.stringify({ dayName: plan.days[progressPanelDayIndex].name, to, sessionDate: progressPanelMode === "dia" ? progressPanelSessionDate : null }) });
-          msg.textContent = "Enviado correctamente a " + to + ".";
-          msg.style.color = "var(--steel)";
-        }catch(e){
-          msg.textContent = "No se pudo enviar: " + e.message;
-          msg.style.color = "var(--down)";
-        } finally {
-          dayEmailBtn.disabled = false; dayEmailBtn.textContent = "Enviarme este informe ahora";
-        }
-      });
+  // 4) Correo
+  const savedEmail = (userProfile && userProfile.progressEmail && userProfile.progressEmail.email) || "";
+  html += `<div class="pp-step" style="margin-top:18px;">4 · Enviarme por correo</div><div class="exercise-card" style="padding:14px;">`;
+  let daySessions = [];
+  if(progressPanelMode === "dia" && dayName){
+    daySessions = state.sessions.filter(s => s.dayName === dayName).sort((a,b)=> new Date(b.date) - new Date(a.date));
+    if(daySessions.length){
+      if(!progressPanelSessionDate || !daySessions.some(s => s.date === progressPanelSessionDate)) progressPanelSessionDate = daySessions[0].date;
+      html += `<div class="hint" style="text-align:left;margin-bottom:6px;">Informe completo de <b>${dayName}</b>. Elige la fecha:</div>
+      <div class="filter-row" style="flex-wrap:wrap;margin-bottom:10px;">
+        ${daySessions.map(s => `<button data-ppsd="${escapeAttr(s.date)}" class="${s.date===progressPanelSessionDate?'active':''}">${new Date(s.date).toLocaleDateString("es-ES")}</button>`).join("")}
+      </div>`;
     }
-    if(progressPanelExercise) renderProgressPanelExercise(plan);
   } else {
-    document.getElementById("progressPanelExerciseSelect").addEventListener("change", (e) => {
-      progressPanelExercise = e.target.value;
-      progressPanelDayName = null;
-      renderProgress();
-    });
-    main.querySelectorAll("[data-pps]").forEach(btn=>{
-      btn.addEventListener("click", ()=>{ progressPanelScope = btn.dataset.pps; progressPanelDayName = null; renderProgress(); });
-    });
-    main.querySelectorAll("[data-ppdn]").forEach(btn=>{
-      btn.addEventListener("click", ()=>{ progressPanelDayName = btn.dataset.ppdn; renderProgress(); });
-    });
-    main.querySelectorAll("[data-ppr]").forEach(btn=>{
-      btn.addEventListener("click", ()=>{ progressPanelRangeDays = btn.dataset.ppr === "all" ? null : parseInt(btn.dataset.ppr,10); renderProgress(); });
-    });
-    renderProgressPanelExercise(plan);
+    html += `<div class="hint" style="text-align:left;margin-bottom:10px;">Se enviará el gráfico de <b>${name}</b>.</div>`;
   }
-}
+  const canSend = !(progressPanelMode === "dia") || daySessions.length > 0;
+  html += canSend ? `<div class="copy-row">
+      <input type="email" id="ppEmailTo" placeholder="tu-email@ejemplo.com" value="${escapeAttr(savedEmail)}">
+      <button id="ppSendBtn">Enviar</button>
+    </div><div class="msg" id="ppEmailMsg" style="margin-top:8px;font-size:12px;"></div>`
+    : `<div class="hint" style="text-align:left;">Todavía no hay sesiones guardadas de este día.</div>`;
+  html += `</div>`;
+  box.innerHTML = html;
 
-function wireProgressPanelModeTabs(){
-  document.querySelectorAll("[data-ppm]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      progressPanelMode = btn.dataset.ppm;
-      progressPanelExercise = null;
-      progressPanelDayName = null;
-      progressPanelSessionDate = null;
-      renderProgress();
-    });
-  });
-}
-
-function renderProgressPanelExercise(plan){
-  const exBody = document.getElementById("progressPanelExerciseBody");
-  if(!exBody) return;
-  const name = progressPanelExercise;
-  const lib = findExerciseByName(name);
-  const expected = computeExpectedMax(name);
-  const muscleLabel = lib ? (lib.sub ? `${lib.muscle} — ${lib.sub}` : lib.muscle) : "";
-  const imgUrl = lib ? exerciseImgUrl(lib.id) : "";
-
-  let chartHtml, chartLabel;
-  if(progressPanelMode === "mensual"){
-    const dayName = plan ? plan.days[progressPanelDayIndex].name : null;
-    const monthlyPoints = buildExerciseMonthlyPoints(name, { dayName });
-    chartHtml = buildSetChartSvg(monthlyPoints, expected, "Necesitas al menos 2 meses con datos de este ejercicio para ver la gráfica mensual.", "big-chart");
-    chartLabel = "Evolución mensual (máximo por mes)";
-  } else if(progressPanelMode === "dia"){
-    const dayName = plan ? plan.days[progressPanelDayIndex].name : null;
-    const points = buildExerciseSetPoints(name, { dayName });
-    chartHtml = buildSetChartSvg(points, expected, "Necesitas al menos 2 series registradas de este ejercicio en este día para ver la gráfica.", "big-chart");
-    chartLabel = "Evolución por serie en este día (kg y repeticiones)";
-  } else {
-    const dayName = (progressPanelScope === "dia") ? progressPanelDayName : null;
-    const points = buildExerciseSetPoints(name, { dayName, rangeDays: progressPanelRangeDays });
-    chartHtml = buildSetChartSvg(points, expected, "Necesitas al menos 2 series registradas con estos filtros para ver la gráfica.", "big-chart");
-    chartLabel = "Evolución por serie (kg y repeticiones)";
-  }
-
-  let html = `<div class="exercise-big-card">
-    <div class="ex-thumb lg" ${imgUrl ? `style="background-image:url('${imgUrl}')"` : ""}></div>
-    <div>
-      <h3>${name}</h3>
-      ${muscleLabel ? `<span class="muscle-tag">${muscleLabel}</span>` : ""}
-    </div>
-  </div>`;
-  html += `<div class="m-label" style="margin:8px 0 6px;">${chartLabel}${expected!=null ? ' · con expectativa para tu experiencia' : ''}</div>`;
-  html += chartHtml;
-
-  // Igual que en el admin: el envío de este ejercicio suelto solo tiene
-  // sentido en modo "Individual por ejercicio" (en "Por día"/"Mensual" ya
-  // está el botón de "Enviarme este informe ahora" encima).
-  const showExerciseEmailBox = progressPanelMode === "individual";
-  if(showExerciseEmailBox){
-    const savedEmail = (userProfile && userProfile.progressEmail && userProfile.progressEmail.email) || "";
-    html += `<div class="copy-row" style="margin-top:14px;">
-      <input type="email" id="progressPanelEmailTo" placeholder="tu-email@ejemplo.com" value="${escapeAttr(savedEmail)}" style="margin-bottom:0;">
-      <button id="btnSendExerciseEmailSelf">Enviarme por email</button>
-    </div>
-    <div class="msg" id="progressPanelEmailMsg"></div>`;
-  }
-
-  exBody.innerHTML = html;
-
-  if(showExerciseEmailBox){
-    document.getElementById("btnSendExerciseEmailSelf").addEventListener("click", async () => {
-      const msg = document.getElementById("progressPanelEmailMsg");
-      const to = document.getElementById("progressPanelEmailTo").value.trim();
+  box.querySelectorAll("[data-ppcv]").forEach(b => b.addEventListener("click", ()=>{ progressPanelChartView = b.dataset.ppcv; renderProgressPanelDetail(plan); }));
+  box.querySelectorAll("[data-ppr]").forEach(b => b.addEventListener("click", ()=>{ progressPanelRangeDays = b.dataset.ppr === "all" ? null : parseInt(b.dataset.ppr,10); renderProgressPanelDetail(plan); }));
+  box.querySelectorAll("[data-ppsd]").forEach(b => b.addEventListener("click", ()=>{ progressPanelSessionDate = b.dataset.ppsd; renderProgressPanelDetail(plan); }));
+  const sendBtn = document.getElementById("ppSendBtn");
+  if(sendBtn){
+    sendBtn.addEventListener("click", async ()=>{
+      const msg = document.getElementById("ppEmailMsg");
+      const to = document.getElementById("ppEmailTo").value.trim();
       if(!to){ msg.textContent = "Escribe a qué email quieres enviarlo."; msg.style.color = "var(--down)"; return; }
-      const btn = document.getElementById("btnSendExerciseEmailSelf");
-      btn.disabled = true; btn.textContent = "Enviando…";
+      sendBtn.disabled = true; sendBtn.textContent = "Enviando…";
       try{
-        await apiFetch("/send-exercise-chart-email", { method:"POST", body: JSON.stringify({ exerciseName: name, to }) });
+        if(progressPanelMode === "dia"){
+          await apiFetch("/send-day-chart-email", { method:"POST", body: JSON.stringify({ dayName, to, sessionDate: progressPanelSessionDate }) });
+        } else {
+          await apiFetch("/send-exercise-chart-email", { method:"POST", body: JSON.stringify({ exerciseName: name, to }) });
+        }
         msg.textContent = "Enviado correctamente a " + to + ".";
         msg.style.color = "var(--steel)";
       }catch(e){
         msg.textContent = "No se pudo enviar: " + e.message;
         msg.style.color = "var(--down)";
       } finally {
-        btn.disabled = false; btn.textContent = "Enviarme por email";
+        sendBtn.disabled = false; sendBtn.textContent = "Enviar";
       }
     });
   }
