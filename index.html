@@ -1805,6 +1805,16 @@ function lastTimeFor(exerciseName){
   return null;
 }
 
+// Series (kg y reps) de la última sesión guardada de un ejercicio, para
+// mostrarlas como "sombra" difuminada en los campos de la sesión de hoy.
+function lastSessionSetsFor(exerciseName){
+  for(let i = state.sessions.length - 1; i >= 0; i--){
+    const ex = state.sessions[i].exercises.find(e => e.name === exerciseName);
+    if(ex && Array.isArray(ex.sets) && ex.sets.length) return ex.sets;
+  }
+  return null;
+}
+
 function renderTrain(){
   const days = activeDays();
   if(days.length === 0){
@@ -1858,11 +1868,16 @@ function renderTrain(){
       </div>
       ${last ? `<div class="last-time" style="margin:0 0 10px;padding:0 2px;">Mejor serie: <b>${last.best} kg x ${last.bestReps}</b></div>` : ``}`;
     html += `<div class="col-heads"><span>#</span><span>Kg</span><span>Reps</span></div><div class="sets">`;
+    const prevSets = lastSessionSetsFor(ex.name);
     for(let s=0; s<ex.sets; s++){
+      // Sombra: marca de esa misma serie en la última sesión guardada
+      const prev = prevSets && prevSets[s];
+      const phKg = prev && prev.kg ? prev.kg : 0;
+      const phReps = prev && prev.reps ? prev.reps : 0;
       html += `<div class="set-row">
         <div class="lbl">${s+1}</div>
-        <div class="field"><input inputmode="decimal" placeholder="0" data-ex="${exIdx}" data-set="${s}" data-type="kg" data-name="${escapeAttr(ex.name)}"><span class="unit">KG</span></div>
-        <div class="field"><input inputmode="numeric" placeholder="0" data-ex="${exIdx}" data-set="${s}" data-type="reps" data-name="${escapeAttr(ex.name)}"><span class="unit">REP</span></div>
+        <div class="field"><input inputmode="decimal" placeholder="${phKg}" data-ex="${exIdx}" data-set="${s}" data-type="kg" data-name="${escapeAttr(ex.name)}"><span class="unit">KG</span></div>
+        <div class="field"><input inputmode="numeric" placeholder="${phReps}" data-ex="${exIdx}" data-set="${s}" data-type="reps" data-name="${escapeAttr(ex.name)}"><span class="unit">REP</span></div>
       </div>`;
     }
     html += `</div>
