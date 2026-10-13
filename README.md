@@ -90,6 +90,28 @@ Desde `admin.html`, con tu clave de administrador:
 
 ---
 
+## 🗂️ Estructura del proyecto
+
+```
+index.html     App del cliente
+admin.html     Panel del administrador
+assets/        Iconos, banner y fotos de ejercicios
+worker.js      API (Cloudflare Workers)
+wrangler.toml  Configuración del Worker
+scripts/       Herramientas para trabajar en local
+docs/          Arquitectura y despliegue
+.github/       Comprobación automática (CI)
+```
+
+- [Arquitectura](docs/ARQUITECTURA.md): qué hace cada pieza y cómo se guardan los datos.
+- [Despliegue](docs/DESPLIEGUE.md): cómo se publica y cómo volver atrás si algo falla.
+
+**Antes de subir cambios:** `node scripts/comprobar.js`. La misma comprobación corre sola en cada subida.
+
+**Textos legales:** Política de Privacidad y Cookies, Aviso Legal y Condiciones de Uso, conforme al RGPD y a la LO 3/2018. Se abren desde el perfil de la app y hay que aceptarlos para entrar.
+
+---
+
 ## 🎯 Sobre mí
 
 Entreno gimnasio, pádel y running de forma combinada, y creo mis propias herramientas cuando las que existen no encajan con lo que necesito. Esta app es una muestra de esa forma de trabajar: **medir todo, no dejar nada a la improvisación.**

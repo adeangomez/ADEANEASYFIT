@@ -1,0 +1,14 @@
+# Sistema y editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+# Node (si algún día se instalan dependencias)
+node_modules/
+# Cloudflare Wrangler
+.wrangler/
+.dev.vars
+# Secretos: nunca al repositorio
+.env
+.env.*
