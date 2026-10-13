@@ -127,6 +127,11 @@
   .col-heads{ display:grid; grid-template-columns: 28px 1fr 1fr; gap:8px; padding: 2px 4px 4px; margin-top:2px; }
   .col-heads span{ font-size:9.5px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint); text-align:center; font-weight:800; }
   .col-heads span:first-child{ visibility:hidden; }
+  .set-row.has-fill, .col-heads.has-fill{ grid-template-columns: 28px 1fr 1fr 36px; }
+  .fill-btn{ width:36px; height:36px; border-radius:9px; background:var(--card-2); border:1.5px solid var(--iron); display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer; }
+  .fill-btn svg{ width:18px; height:18px; }
+  .fill-btn:disabled{ opacity:.3; cursor:default; }
+  .fill-btn:active:not(:disabled){ background:var(--iron-dim); }
 
   /* Selector de ejercicios (biblioteca cerrada) */
   .ex-picker-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
@@ -1773,6 +1778,19 @@ function wireTodayEditControls(day){
       renderTrain();
     });
   });
+  // Tick: rellena con la sombra (última sesión) solo los campos que estén vacíos
+  document.querySelectorAll(".fill-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const sel = `[data-ex="${btn.dataset.fillEx}"][data-set="${btn.dataset.fillSet}"]`;
+      document.querySelectorAll(`input${sel}`).forEach(inp=>{
+        const ph = parseFloat(inp.placeholder);
+        if(inp.value.trim()==="" && ph>0){
+          inp.value = inp.placeholder;
+          inp.dispatchEvent(new Event("input",{bubbles:true}));
+        }
+      });
+    });
+  });
   document.querySelectorAll(".today-add-set-btn").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       const exercises = getTrainExercises(day);
@@ -1887,17 +1905,18 @@ function renderTrain(){
         </div>
       </div>
       ${last ? `<div class="last-time" style="margin:0 0 10px;padding:0 2px;">Mejor serie: <b>${last.best} kg x ${last.bestReps}</b></div>` : ``}`;
-    html += `<div class="col-heads"><span>#</span><span>Kg</span><span>Reps</span></div><div class="sets">`;
+    html += `<div class="col-heads has-fill"><span>#</span><span>Kg</span><span>Reps</span><span></span></div><div class="sets">`;
     const prevSets = lastSessionSetsFor(ex.name);
     for(let s=0; s<ex.sets; s++){
       // Sombra: marca de esa misma serie en la última sesión guardada
       const prev = prevSets && prevSets[s];
       const phKg = prev && prev.kg ? prev.kg : 0;
       const phReps = prev && prev.reps ? prev.reps : 0;
-      html += `<div class="set-row">
+      html += `<div class="set-row has-fill">
         <div class="lbl">${s+1}</div>
         <div class="field"><input inputmode="decimal" placeholder="${phKg}" data-ex="${exIdx}" data-set="${s}" data-type="kg" data-name="${escapeAttr(ex.name)}"><span class="unit">KG</span></div>
         <div class="field"><input inputmode="numeric" placeholder="${phReps}" data-ex="${exIdx}" data-set="${s}" data-type="reps" data-name="${escapeAttr(ex.name)}"><span class="unit">REP</span></div>
+        <button type="button" class="fill-btn" data-fill-ex="${exIdx}" data-fill-set="${s}" ${phKg||phReps ? "" : "disabled"} title="Rellenar con la última sesión" aria-label="Rellenar con la última sesión"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#ff5a2e" stroke-width="6"/><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#000" stroke-width="2.6"/></svg></button>
       </div>`;
     }
     html += `</div>
