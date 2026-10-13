@@ -1502,7 +1502,7 @@ function showUpdateWeightModal(){
 // TEXTOS LEGALES (LO 3/2018 + RGPD + LSSI-CE). Al cambiar su contenido hay
 // que subir LEGAL_VERSION: todos los usuarios tendrán que volver a aceptar.
 // =======================================================================
-const LEGAL_VERSION = "2026-10-13";
+const LEGAL_VERSION = "2026-10-13b";
 const LEGAL_EMAIL = "adeangomez873@gmail.com";
 const LEGAL_INSTAGRAM = "adeangomez";
 const LEGAL_CONTACT_HTML = `<a href="mailto:${LEGAL_EMAIL}">${LEGAL_EMAIL}</a> · Instagram <a href="https://instagram.com/${LEGAL_INSTAGRAM}" target="_blank" rel="noopener">@${LEGAL_INSTAGRAM}</a>`;
@@ -1548,7 +1548,8 @@ const LEGAL_DOCS = {
         <p>La app <b>no usa cookies</b>. Solo guarda en tu navegador (almacenamiento local) lo imprescindible para funcionar: tu sesión iniciada, tu nombre de usuario, el borrador del entrenamiento que estás rellenando y tus preferencias de pantalla. Al ser estrictamente necesario, no requiere tu consentimiento (art. 22.2 LSSI-CE), y por eso no mostramos un banner.</p>
         <p>No usamos analítica, publicidad ni cookies de terceros. Si algún día las añadiéramos, te pediríamos antes tu consentimiento. Puedes borrar el almacenamiento desde los ajustes de tu navegador o cerrando sesión.</p>` },
       { h: "8. Edad y cambios", html: `
-        <p>La app es para mayores de 18 años. Si cambiamos esta política de forma relevante, te pediremos que aceptes la nueva versión antes de seguir usándola.</p>
+        <p><b>Edad.</b> Puedes dar tu consentimiento por ti mismo si tienes 14 años o más (art. 7 LOPDGDD). Los menores de 14 solo pueden usar la app con el consentimiento de sus padres o tutores. En los casos en que la ley exija expresamente la intervención de los tutores, también la pediremos.</p>
+        <p>Si cambiamos esta política de forma relevante, te pediremos que aceptes la nueva versión antes de seguir usándola.</p>
         <p><i>Versión ${LEGAL_VERSION}.</i></p>` },
     ],
   },
@@ -1579,7 +1580,7 @@ const LEGAL_DOCS = {
       { h: "2. Cuenta y acceso", html: `
         <ul>
           <li>Las cuentas las crea el administrador; no hay registro libre.</li>
-          <li>Debes tener al menos 18 años.</li>
+          <li>Debes tener al menos 14 años (art. 7 LOPDGDD). Los menores de 14 solo pueden usarla con el consentimiento de sus padres o tutores, y también cuando la ley exija expresamente su intervención.</li>
           <li>Los datos que das (peso, altura, experiencia) deben ser veraces y actuales.</li>
           <li>Eres responsable de guardar tu contraseña y de lo que se haga con tu cuenta. No la compartas. Avísanos si sospechas un acceso no autorizado.</li>
         </ul>` },
