@@ -406,6 +406,10 @@
   .legal-body ul{ margin:0 0 10px; padding-left:18px; }
   .legal-body li{ margin-bottom:4px; }
   .legal-body b{ color:var(--text); }
+  .legal-body a{ color: var(--iron); }
+  .legal-links{ display:flex; flex-wrap:wrap; gap:2px 10px; margin:0 0 12px; }
+  .consent-row{ display:flex; gap:10px; align-items:flex-start; margin:0 0 14px; font-size:13px; line-height:1.5; color:var(--text); cursor:pointer; }
+  .consent-row input{ margin-top:3px; width:18px; height:18px; flex-shrink:0; accent-color: var(--iron); }
   .legal-disclaimer{ font-size:11px; color:var(--text-faint); font-style:italic; padding:14px 2px 2px; line-height:1.5; }
   .modal-sheet h3{ margin:0 0 4px; font-size:20px; }
   .modal-sheet .modal-sub{ font-size:12.5px; color:var(--text-faint); margin-bottom:20px; }
@@ -1135,7 +1139,7 @@ async function onOnboardSubmit(e){
   const btn = document.getElementById("onboardSubmit");
   btn.disabled = true; btn.textContent = "Guardando…";
 
-  userProfile = { weightKg: weight, heightCm: height, timeTraining: time, weightUpdatedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), weightHistory: [] };
+  userProfile = { weightKg: weight, heightCm: height, timeTraining: time, weightUpdatedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), weightHistory: [], consents: pendingConsents };
   userProfile.weightHistory.push({ date: userProfile.weightUpdatedAt, weightKg: weight });
   try{
     await apiSaveData();
@@ -1151,11 +1155,17 @@ async function onOnboardSubmit(e){
 
 function renderApp(){
   const app = document.getElementById("app");
-  document.body.classList.toggle("auth-mode", !currentUser || (currentUser && !userProfile));
+  document.body.classList.toggle("auth-mode", !currentUser || (currentUser && !userProfile) || needsConsent());
 
   if(!currentUser){
     app.innerHTML = authScreenHtml();
     wireAuthEvents();
+    return;
+  }
+
+  if(needsConsent()){
+    app.innerHTML = consentScreenHtml();
+    wireConsentEvents();
     return;
   }
 
@@ -1315,7 +1325,9 @@ function showAccountModal(){
         ${locked ? `${ICON_LOCK_INLINE} Podrás actualizar el peso en ${daysUntilWeightUpdate()} día${daysUntilWeightUpdate()===1?'':'s'}` : "Introducir peso en ayunas"}
       </button>
       <button class="btn-secondary" id="changePassBtn">Cambiar contraseña</button>
-      <button class="btn-secondary" id="legalBtn">Términos y avisos legales</button>
+      <button class="btn-secondary" data-legal-open="privacidad">Política de Privacidad y Cookies</button>
+      <button class="btn-secondary" data-legal-open="aviso">Aviso Legal</button>
+      <button class="btn-secondary" data-legal-open="condiciones">Condiciones de Uso</button>
       <button class="btn-primary" id="logoutBtn" style="background:var(--card-2);color:var(--text);border:1px solid var(--line);margin-top:10px;">Cerrar sesión</button>
       <button class="btn-secondary" id="closeModalBtn">Cancelar</button>
     </div>
@@ -1323,15 +1335,15 @@ function showAccountModal(){
   document.body.appendChild(overlay);
   overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeModal(overlay); });
   document.getElementById("closeModalBtn").addEventListener("click", ()=> closeModal(overlay));
-  document.getElementById("legalBtn").addEventListener("click", ()=>{
+  overlay.querySelectorAll("[data-legal-open]").forEach(b=> b.addEventListener("click", ()=>{
     closeModal(overlay);
-    showLegalModal();
-  });
+    showLegalDoc(b.dataset.legalOpen);
+  }));
   document.getElementById("logoutBtn").addEventListener("click", async ()=>{
     closeModal(overlay);
     await apiLogout();
     clearLocalSession();
-    currentUser = null; authToken = null; state = null; plans = []; activePlanId = null; userProfile = null; weightReminderDismissed = false;
+    currentUser = null; authToken = null; state = null; plans = []; activePlanId = null; userProfile = null; pendingConsents = null; weightReminderDismissed = false;
     activeTab = "train";
     renderApp();
   });
@@ -1486,66 +1498,126 @@ function showUpdateWeightModal(){
   });
 }
 
-function showLegalModal(){
+// =======================================================================
+// TEXTOS LEGALES (LO 3/2018 + RGPD + LSSI-CE). Al cambiar su contenido hay
+// que subir LEGAL_VERSION: todos los usuarios tendrán que volver a aceptar.
+// =======================================================================
+const LEGAL_VERSION = "2026-10-13";
+const LEGAL_EMAIL = "adeangomez873@gmail.com";
+const LEGAL_INSTAGRAM = "adeangomez";
+const LEGAL_CONTACT_HTML = `<a href="mailto:${LEGAL_EMAIL}">${LEGAL_EMAIL}</a> · Instagram <a href="https://instagram.com/${LEGAL_INSTAGRAM}" target="_blank" rel="noopener">@${LEGAL_INSTAGRAM}</a>`;
+
+const LEGAL_DOCS = {
+  privacidad: {
+    title: "Política de Privacidad y Cookies",
+    sections: [
+      { h: "1. Responsable del tratamiento", open: true, html: `
+        <p><b>Titular:</b> Adrián Gómez Carcedo, persona física.<br><b>Contacto:</b> ${LEGAL_CONTACT_HTML}</p>
+        <p>Esta política explica qué datos guarda ADEANEASYFIT, para qué, durante cuánto tiempo y cómo puedes ejercer tus derechos, conforme al Reglamento (UE) 2016/679 (RGPD) y a la Ley Orgánica 3/2018 (LOPDGDD).</p>` },
+      { h: "2. Qué datos tratamos y para qué", html: `
+        <ul>
+          <li><b>Cuenta:</b> nombre de usuario y contraseña (se guarda cifrada). Finalidad: que puedas entrar. Base: ejecución del servicio.</li>
+          <li><b>Datos de entrenamiento y salud:</b> peso, altura, tiempo entrenando, historial de peso, rutinas, series, kilos, repeticiones y sesiones de cardio. Finalidad: registrar y comparar tu progreso, y que el administrador (tu entrenador) te haga el seguimiento. Base: tu consentimiento expreso (art. 9.2.a RGPD).</li>
+          <li><b>Foto de perfil (opcional):</b> la subes tú y el administrador puede revisarla y quitarla. Base: tu consentimiento.</li>
+          <li><b>Email para informes (opcional):</b> el que escribas en Progreso, con la frecuencia que elijas. Base: tu consentimiento.</li>
+          <li><b>Análisis con inteligencia artificial:</b> si usas esta función, tus datos de entrenamiento se envían a la IA para generar rutinas o análisis. No se toman decisiones automatizadas con efectos jurídicos sobre ti.</li>
+          <li><b>Fecha y versión de lo que aceptas:</b> para poder demostrar tu consentimiento (art. 7.1 RGPD).</li>
+        </ul>
+        <p>El peso, las medidas y los entrenamientos pueden revelar información sobre tu salud, por eso son datos de categoría especial y solo los tratamos con tu consentimiento. No vendemos tus datos ni los usamos para publicidad.</p>` },
+      { h: "3. Quién puede ver tus datos", html: `
+        <p>Los ve el administrador de la app, que es también tu entrenador. No se ceden a terceros salvo obligación legal. Para funcionar usamos estos proveedores, que actúan como encargados del tratamiento (art. 28 RGPD):</p>
+        <ul>
+          <li><b>Cloudflare</b> (Workers, base de datos KV y Workers AI): aloja el servidor, guarda tus datos y ejecuta los análisis de IA.</li>
+          <li><b>GitHub Pages</b>: sirve la aplicación web. Puede registrar tu dirección IP al descargarla.</li>
+          <li><b>Resend</b>: envía los correos de informes que pidas.</li>
+          <li><b>QuickChart</b>: dibuja las gráficas que aparecen en esos correos. Recibe los ejercicios y marcas de la gráfica, sin tu nombre de usuario.</li>
+        </ul>
+        <p>Algunos de estos proveedores pueden tratar datos fuera del Espacio Económico Europeo. En ese caso lo hacen con garantías adecuadas, como las cláusulas contractuales tipo de la Comisión Europea o el Marco de Privacidad de Datos UE-EE. UU.</p>` },
+      { h: "4. Cuánto tiempo los guardamos", html: `
+        <p>Mientras tu cuenta esté activa. Cuando pidas la baja o la supresión, borramos tus datos, salvo los que una ley obligue a conservar. Esos quedan <b>bloqueados</b>: apartados, sin uso y solo a disposición de jueces, tribunales, Ministerio Fiscal y Administraciones públicas durante el plazo de prescripción de las posibles responsabilidades (art. 32 LOPDGDD). Después se destruyen.</p>` },
+      { h: "5. Tus derechos", html: `
+        <p>Puedes ejercerlos gratis escribiendo a <a href="mailto:${LEGAL_EMAIL}">${LEGAL_EMAIL}</a>, indicando tu usuario y el derecho que ejerces. Si dudamos de tu identidad, podremos pedirte que la acredites. Respondemos en un mes como máximo, ampliable en dos meses más si la solicitud es compleja (art. 12 RGPD).</p>
+        <p><b>Derecho de acceso</b> (art. 15 RGPD y art. 13 LOPDGDD). Tienes derecho a acceder a los datos personales que te conciernen y a ejercer este derecho con facilidad y a intervalos razonables, para conocer y verificar la licitud del tratamiento. Se considerará repetitivo si lo pides más de una vez en seis meses sin causa legítima.</p>
+        <p><b>Derecho de rectificación</b> (art. 16 RGPD y art. 14 LOPDGDD). Tienes derecho a obtener sin dilación indebida la rectificación de los datos inexactos que te conciernan. En tu solicitud debes indicar a qué datos te refieres y la corrección que hay que hacer, y aportar la documentación que la justifique cuando sea necesario. Tu peso, rutinas y entrenamientos también puedes corregirlos tú desde la app.</p>
+        <p><b>Derecho de supresión</b> (art. 17 RGPD y art. 15 LOPDGDD). Puedes pedir que borremos tus datos cuando ya no sean necesarios, retires tu consentimiento o el tratamiento sea ilícito. En algunos casos <b>solo podremos bloquearlos y no borrarlos</b>: cuando una ley obligue a conservarlos, como ocurre con los registros oficiales (por ejemplo, académicos o fiscales), o los necesitemos para formular o defender reclamaciones. Te diremos qué hemos borrado y qué bloqueado, y por qué.</p>
+        <p><b>Otros derechos:</b> limitación del tratamiento (art. 18 RGPD), portabilidad (art. 20), oposición (art. 21) y retirada del consentimiento en cualquier momento (art. 7.3), sin que afecte a lo tratado antes. Si retiras el consentimiento de los datos de entrenamiento y salud, no podremos prestarte el servicio.</p>
+        <p>Si crees que no hemos atendido bien tus derechos, puedes reclamar ante la Agencia Española de Protección de Datos (<a href="https://www.aepd.es" target="_blank" rel="noopener">www.aepd.es</a>).</p>` },
+      { h: "6. Seguridad", html: `
+        <p>Las comunicaciones van cifradas, las contraseñas se guardan cifradas y cada usuario solo accede a sus propios datos. Si hubiera una brecha que te afectara con riesgo alto, te lo comunicaremos sin dilación indebida.</p>` },
+      { h: "7. Cookies y almacenamiento en tu dispositivo", html: `
+        <p>La app <b>no usa cookies</b>. Solo guarda en tu navegador (almacenamiento local) lo imprescindible para funcionar: tu sesión iniciada, tu nombre de usuario, el borrador del entrenamiento que estás rellenando y tus preferencias de pantalla. Al ser estrictamente necesario, no requiere tu consentimiento (art. 22.2 LSSI-CE), y por eso no mostramos un banner.</p>
+        <p>No usamos analítica, publicidad ni cookies de terceros. Si algún día las añadiéramos, te pediríamos antes tu consentimiento. Puedes borrar el almacenamiento desde los ajustes de tu navegador o cerrando sesión.</p>` },
+      { h: "8. Edad y cambios", html: `
+        <p>La app es para mayores de 18 años. Si cambiamos esta política de forma relevante, te pediremos que aceptes la nueva versión antes de seguir usándola.</p>
+        <p><i>Versión ${LEGAL_VERSION}.</i></p>` },
+    ],
+  },
+  aviso: {
+    title: "Aviso Legal",
+    sections: [
+      { h: "1. Titular", open: true, html: `
+        <p>En cumplimiento del art. 10 de la Ley 34/2002 (LSSI-CE), se informa de que la aplicación ADEANEASYFIT es titularidad de <b>Adrián Gómez Carcedo</b>, persona física, sin empresa constituida.<br><b>Contacto:</b> ${LEGAL_CONTACT_HTML}</p>
+        <p>Es una aplicación de seguimiento de entrenamiento físico. El acceso está restringido a usuarios con cuenta creada por el administrador.</p>` },
+      { h: "2. Propiedad intelectual e industrial", html: `
+        <p>El código fuente, el diseño, la estructura, la interfaz, los textos, el nombre ADEANEASYFIT, los logotipos, las ilustraciones de ejercicios y las bases de datos de la aplicación son propiedad del titular o se usan con permiso de sus autores. Están protegidos por el Real Decreto Legislativo 1/1996 (Ley de Propiedad Intelectual), por la Directiva 2009/24/CE sobre programas de ordenador y por la normativa de propiedad industrial.</p>
+        <p><b>Queda prohibido</b>, sin autorización previa y por escrito del titular, reproducir, distribuir, comunicar públicamente, transformar, descompilar, extraer o reutilizar la aplicación, su código o sus contenidos, total o parcialmente, salvo lo que la ley permita expresamente.</p>
+        <p>El uso de la app te da una licencia personal, limitada, revocable, no exclusiva e intransferible para usarla según su finalidad. No te cede ningún derecho de propiedad sobre ella.</p>
+        <p><b>Tus contenidos.</b> Tus datos de entrenamiento y tu foto de perfil siguen siendo tuyos. Nos permites tratarlos solo para prestarte el servicio, como explica la Política de Privacidad.</p>
+        <p><b>Si crees que se infringen tus derechos</b>, escribe a ${LEGAL_EMAIL} indicando qué contenido es, cuál es tu derecho y cómo contactarte. Lo revisaremos con rapidez y lo retiraremos si procede.</p>` },
+      { h: "3. Responsabilidad", html: `
+        <p>Procuramos que la app funcione y sea correcta, pero no garantizamos que no haya interrupciones o errores. Los contenidos de entrenamiento, las gráficas y los análisis (incluidos los hechos con inteligencia artificial) son orientativos y no sustituyen el consejo de un profesional sanitario o del deporte. No respondemos de los daños derivados de un uso indebido de la app ni del contenido de sitios web de terceros.</p>` },
+      { h: "4. Modificaciones, ley y jurisdicción", html: `
+        <p>Podemos actualizar este aviso; la versión vigente es la publicada en la app. Se rige por la ley española. Si eres consumidor, podrás acudir a los juzgados y tribunales de tu domicilio.</p>
+        <p><i>Versión ${LEGAL_VERSION}.</i></p>` },
+    ],
+  },
+  condiciones: {
+    title: "Condiciones Generales de Uso",
+    sections: [
+      { h: "1. Objeto y aceptación", open: true, html: `
+        <p>ADEANEASYFIT es una herramienta para registrar y seguir tu entrenamiento. La ofrece Adrián Gómez Carcedo (el "titular"; contacto: ${LEGAL_CONTACT_HTML}). Al usarla aceptas estas condiciones, el Aviso Legal y la Política de Privacidad. Si no estás de acuerdo, no la uses.</p>` },
+      { h: "2. Cuenta y acceso", html: `
+        <ul>
+          <li>Las cuentas las crea el administrador; no hay registro libre.</li>
+          <li>Debes tener al menos 18 años.</li>
+          <li>Los datos que das (peso, altura, experiencia) deben ser veraces y actuales.</li>
+          <li>Eres responsable de guardar tu contraseña y de lo que se haga con tu cuenta. No la compartas. Avísanos si sospechas un acceso no autorizado.</li>
+        </ul>` },
+      { h: "3. Reglas de uso", html: `
+        <p>Te comprometes a usar la app de buena fe y conforme a la ley. No puedes acceder a datos de otros usuarios, intentar vulnerar la seguridad, saturar el servicio, copiar o revender la app o sus contenidos, ni subir fotos u otros contenidos ilícitos, ofensivos o explícitos. El titular puede suspender o cerrar tu cuenta si incumples estas reglas.</p>` },
+      { h: "4. Salud y entrenamiento", html: `
+        <p>La app registra y compara tus marcas, pero no da diagnósticos ni consejo médico. Antes de empezar a entrenar, o si tienes una lesión, una enfermedad o dudas, consulta con un profesional sanitario. Entrenas bajo tu responsabilidad: ajusta las cargas a tu estado y detente si notas dolor o malestar. Las rutinas y los análisis, incluidos los de inteligencia artificial, son orientativos.</p>` },
+      { h: "5. Contratación", html: `
+        <p>El uso de la app es gratuito y no implica ninguna compra. Si en el futuro se ofrece algún servicio de pago, se mostrará el precio con impuestos incluidos antes de contratar, junto con las condiciones y tu derecho de desistimiento de 14 días como consumidor (arts. 102 y siguientes del Real Decreto Legislativo 1/2007).</p>` },
+      { h: "6. Disponibilidad y responsabilidad", html: `
+        <p>Hacemos lo posible para que la app funcione sin interrupciones, pero puede haber paradas por mantenimiento, fallos o causas ajenas. No respondemos de los daños indirectos ni de la pérdida de datos por causas fuera de nuestro control, sin limitar la responsabilidad que la ley no permita excluir.</p>` },
+      { h: "7. Tus datos y tus derechos", html: `
+        <p>Tratamos tus datos como explica la Política de Privacidad. Puedes ejercer tus derechos de acceso, rectificación, supresión y los demás escribiendo a ${LEGAL_EMAIL}.</p>` },
+      { h: "8. Baja de la cuenta", html: `
+        <p>Puedes dejar de usar la app y pedir la baja cuando quieras. Al darte de baja borramos tus datos, salvo los que la ley obligue a conservar, que quedan bloqueados (ver la Política de Privacidad).</p>` },
+      { h: "9. Cambios, ley aplicable y reclamaciones", html: `
+        <p>Si cambiamos estas condiciones de forma relevante, subiremos la versión y te pediremos que aceptes la nueva antes de seguir usando la app. Se rigen por la ley española; si eres consumidor, podrás acudir a los juzgados de tu domicilio. Puedes reclamar también escribiendo a ${LEGAL_EMAIL}.</p>
+        <p><i>Versión ${LEGAL_VERSION}.</i></p>` },
+    ],
+  },
+};
+
+function showLegalDoc(key){
+  const doc = LEGAL_DOCS[key];
+  if(!doc) return;
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal-sheet legal-sheet">
-      <h3>Términos y avisos legales</h3>
-      <div class="modal-sub">Última actualización: ${new Date().toLocaleDateString("es-ES")}</div>
+      <h3>${doc.title}</h3>
+      <div class="modal-sub">Versión ${LEGAL_VERSION}</div>
       <div class="legal-scroll">
-
-        <details class="legal-section" open>
-          <summary>1. Aviso legal</summary>
-          <div class="legal-body">
-            <p>En cumplimiento de la Ley 34/2002, de 11 de julio, de Servicios de la Sociedad de la Información y de Comercio Electrónico (LSSI-CE), se informa de los siguientes datos:</p>
-            <p><b>Titular de la aplicación:</b> Adrián Gómez Carcedo<br>
-            <b>Contacto:</b> adeangomez873@gmail.com</p>
-            <p>Adeanfit es una aplicación de uso personal para el seguimiento de entrenamiento físico. El acceso está restringido a usuarios con cuenta creada por el administrador de la aplicación.</p>
-          </div>
-        </details>
-
-        <details class="legal-section">
-          <summary>2. Términos de uso</summary>
-          <div class="legal-body">
-            <p>El acceso y uso de esta aplicación atribuye la condición de usuario e implica la aceptación de estos términos. El uso está limitado a fines personales y no comerciales, salvo autorización expresa del titular.</p>
-            <p>El usuario se compromete a:</p>
-            <ul>
-              <li>No compartir sus credenciales de acceso con terceros.</li>
-              <li>No intentar acceder a datos de otros usuarios ni a partes restringidas del sistema.</li>
-              <li>Usar la aplicación de forma diligente y conforme a la ley, la moral y el orden público.</li>
-            </ul>
-            <p>El titular podrá suspender o cancelar el acceso de cualquier usuario en caso de incumplimiento de estos términos.</p>
-            <p><b>Sin garantía médica:</b> los contenidos de entrenamiento, las gráficas de progreso y los análisis generados (incluidos los realizados con inteligencia artificial) tienen una finalidad orientativa e informativa, y en ningún caso sustituyen el consejo de un profesional médico o del deporte cualificado.</p>
-          </div>
-        </details>
-
-        <details class="legal-section">
-          <summary>3. Propiedad intelectual e industrial</summary>
-          <div class="legal-body">
-            <p>El código fuente, el diseño, la estructura de navegación, las ilustraciones de ejercicios, los textos, los logotipos y demás elementos de esta aplicación son propiedad del titular o de terceros que han autorizado su uso, y están protegidos por la normativa española y de la Unión Europea en materia de propiedad intelectual, en particular por el Real Decreto Legislativo 1/1996, de 12 de abril, por el que se aprueba el texto refundido de la Ley de Propiedad Intelectual, y por la Directiva 2009/24/CE relativa a la protección jurídica de los programas de ordenador.</p>
-            <p><b>Queda expresamente prohibida</b> la reproducción, distribución, comunicación pública, transformación o puesta a disposición de la aplicación, de su código, de sus contenidos o de sus imágenes, total o parcialmente, por cualquier medio y en cualquier soporte, sin autorización previa y por escrito del titular.</p>
-            <p>El incumplimiento de lo anterior podrá dar lugar a las acciones legales que correspondan conforme a la legislación vigente.</p>
-          </div>
-        </details>
-
-        <details class="legal-section">
-          <summary>4. Protección de datos personales</summary>
-          <div class="legal-body">
-            <p>De conformidad con el Reglamento (UE) 2016/679 (RGPD) y la Ley Orgánica 3/2018, de Protección de Datos Personales y garantía de los derechos digitales (LOPDGDD):</p>
-            <p><b>Responsable del tratamiento:</b> Adrián Gómez Carcedo — adeangomez873@gmail.com</p>
-            <p><b>Datos tratados:</b> usuario, contraseña (almacenada cifrada), peso, altura, tiempo de experiencia entrenando, y datos de las sesiones de entrenamiento que el usuario registra (ejercicios, series, repeticiones y cargas).</p>
-            <p><b>Finalidad:</b> prestar el servicio de seguimiento de entrenamiento, calcular comparativas de progreso, y generar análisis mediante inteligencia artificial a partir de esos datos.</p>
-            <p><b>Base legal:</b> ejecución de la relación de uso solicitada por el propio usuario al utilizar la aplicación.</p>
-            <p><b>Conservación:</b> los datos se conservan mientras la cuenta permanezca activa. El titular puede eliminar una cuenta y sus datos asociados a petición del usuario.</p>
-            <p><b>Cesión a terceros:</b> los datos no se ceden a terceros, salvo obligación legal. El procesamiento de análisis con inteligencia artificial se realiza mediante infraestructura de Cloudflare (Workers AI), actuando como encargado del tratamiento.</p>
-            <p><b>Derechos:</b> el usuario puede ejercer sus derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad escribiendo a adeangomez873@gmail.com.</p>
-          </div>
-        </details>
-
-        <div class="legal-disclaimer">
-          Este es un texto de plantilla genérica orientado a un uso personal. Si esta aplicación pasa a tener un uso comercial o un volumen de usuarios mayor, se recomienda su revisión por un profesional del derecho.
-        </div>
+        ${doc.sections.map(s => `
+          <details class="legal-section" ${s.open ? "open" : ""}>
+            <summary>${s.h}</summary>
+            <div class="legal-body">${s.html}</div>
+          </details>`).join("")}
+        <div class="legal-disclaimer">Borrador sujeto a revisión por un profesional del derecho.</div>
       </div>
       <button class="btn-secondary" id="closeLegalBtn">Cerrar</button>
     </div>
@@ -1553,6 +1625,80 @@ function showLegalModal(){
   document.body.appendChild(overlay);
   overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeModal(overlay); });
   document.getElementById("closeLegalBtn").addEventListener("click", ()=> closeModal(overlay));
+}
+
+// ---- Consentimientos obligatorios (sin ellos no se entra en la app) ----
+let pendingConsents = null; // aceptados antes de crear el perfil (primer acceso)
+
+function consentsOk(c){
+  return !!(c && c.version === LEGAL_VERSION && c.privacidad && c.datosSalud);
+}
+function needsConsent(){
+  if(!currentUser) return false;
+  return !consentsOk(userProfile ? userProfile.consents : pendingConsents);
+}
+
+function consentScreenHtml(){
+  return `
+    <div class="auth-wrap">
+      <img class="auth-logo" src="https://adeangomez.github.io/ADEANEASYFIT/assets/icon.png" alt="Adeanfit">
+      <h1 class="auth-title display">ANTES DE ENTRAR</h1>
+      <div class="auth-sub">Para guardar tus entrenamientos y que tu entrenador te haga el seguimiento, necesitamos tu permiso. Algunos de estos datos se consideran datos de salud. Puedes retirarlo cuando quieras escribiendo a ${LEGAL_EMAIL}.</div>
+      <div class="auth-card">
+        <div class="auth-error" id="consentError"></div>
+        <div class="legal-links">
+          <button type="button" class="btn-text" data-legal="privacidad">Política de Privacidad y Cookies</button>
+          <button type="button" class="btn-text" data-legal="aviso">Aviso Legal</button>
+          <button type="button" class="btn-text" data-legal="condiciones">Condiciones de Uso</button>
+        </div>
+        <label class="consent-row"><input type="checkbox" id="consentPriv"><span>He leído y acepto las condiciones de uso y la política de privacidad.</span></label>
+        <label class="consent-row"><input type="checkbox" id="consentHealth"><span>Acepto que se guarden mis entrenamientos, peso y medidas, y que mi entrenador los vea para hacer mi seguimiento.</span></label>
+        <button type="button" class="btn-primary" id="consentAccept" disabled>Aceptar y continuar</button>
+        <button type="button" class="btn-secondary" id="consentDecline" style="margin-top:10px;">No acepto. Cerrar sesión</button>
+      </div>
+    </div>
+  `;
+}
+
+function wireConsentEvents(){
+  const p = document.getElementById("consentPriv");
+  const h = document.getElementById("consentHealth");
+  const btn = document.getElementById("consentAccept");
+  const errEl = document.getElementById("consentError");
+  const refresh = ()=>{ btn.disabled = !(p.checked && h.checked); };
+  p.addEventListener("change", refresh);
+  h.addEventListener("change", refresh);
+  document.querySelectorAll("[data-legal]").forEach(b => b.addEventListener("click", ()=> showLegalDoc(b.dataset.legal)));
+  btn.addEventListener("click", async ()=>{
+    if(!(p.checked && h.checked)) return;
+    errEl.classList.remove("show");
+    const now = new Date().toISOString();
+    const rec = { version: LEGAL_VERSION, privacidad: now, datosSalud: now };
+    btn.disabled = true; btn.textContent = "Guardando…";
+    if(userProfile){
+      const prev = userProfile.consents;
+      userProfile.consents = rec;
+      try{
+        await apiSaveData();
+      }catch(e){
+        userProfile.consents = prev;
+        errEl.textContent = "No se pudo guardar: " + e.message;
+        errEl.classList.add("show");
+        btn.disabled = false; btn.textContent = "Aceptar y continuar";
+        return;
+      }
+    } else {
+      pendingConsents = rec; // se guarda junto al perfil al terminar el alta
+    }
+    renderApp();
+  });
+  document.getElementById("consentDecline").addEventListener("click", async ()=>{
+    await apiLogout();
+    clearLocalSession();
+    currentUser = null; authToken = null; state = null; plans = []; activePlanId = null; userProfile = null; pendingConsents = null; weightReminderDismissed = false;
+    activeTab = "train";
+    renderApp();
+  });
 }
 
 function showChangePasswordModal(){
