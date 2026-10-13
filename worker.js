@@ -1022,20 +1022,38 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
     }
 
     // ---------------------------------------------------------------
-    // ADMIN: enviar por email la gráfica de un ejercicio concreto de un
-    // cliente (desde el Panel de clientes)  (POST /admin/send-exercise-chart-email)
-    // Header: X-Admin-Key   Body: { "username": "...", "exerciseName": "...", "to": "..." }
+    // ENVIAR UN INFORME POR EMAIL (un único handler para cliente y admin)
+    //   POST /send-report-email         (cliente: Authorization: Bearer <token>)
+    //   POST /admin/send-report-email   (admin: X-Admin-Key, requiere "username")
+    // Body: { kind: "day"|"exercise", to, dayName?, sessionDate?, exerciseName?, comment? }
+    // "comment" solo lo admite la vía admin. Las rutas antiguas
+    // (/send-day-chart-email, etc.) siguen funcionando como alias.
     // ---------------------------------------------------------------
-    if (path === "/admin/send-exercise-chart-email" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+    const REPORT_ROUTES = {
+      "/send-report-email": [false, null],
+      "/admin/send-report-email": [true, null],
+      "/send-day-chart-email": [false, "day"],
+      "/send-exercise-chart-email": [false, "exercise"],
+      "/admin/send-day-chart-email": [true, "day"],
+      "/admin/send-exercise-chart-email": [true, "exercise"],
+    };
+    if (REPORT_ROUTES[path] && request.method === "POST") {
+      const [isAdmin, fixedKind] = REPORT_ROUTES[path];
+      let username;
+      if (isAdmin) {
+        if ((request.headers.get("X-Admin-Key") || "") !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      } else {
+        username = await getUserFromToken(env, request);
+        if (!username) return err("No autenticado.", 401);
+      }
 
       const body = await request.json().catch(() => ({}));
-      const username = normalizeUsername(body.username);
-      const exerciseName = String(body.exerciseName || "").trim();
+      if (isAdmin) {
+        username = normalizeUsername(body.username);
+        if (!username) return err("Usuario inválido.");
+      }
+      const kind = fixedKind || String(body.kind || "");
       const to = String(body.to || "").trim();
-      if (!username) return err("Usuario inválido.");
-      if (!exerciseName) return err("Falta el ejercicio.");
       if (!to) return err("Indica a qué email quieres enviarlo.");
 
       const dataRaw = await env.ADEANFIT_KV.get("data:" + username);
@@ -1043,101 +1061,23 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       const data = JSON.parse(dataRaw);
 
       try {
-        const html = buildExerciseChartEmailHtml(username, data, exerciseName);
-        await sendEmailViaResend(env, to, `Progreso de ${username} — ${exerciseName}`, html);
-        return json({ ok: true, to });
-      } catch (e) {
-        return err("No se pudo enviar: " + e.message, 502);
-      }
-    }
-
-    // ---------------------------------------------------------------
-    // ADMIN: enviar por email el informe completo de un día de rutina de un
-    // cliente (desde el Panel de clientes)  (POST /admin/send-day-chart-email)
-    // Header: X-Admin-Key   Body: { "username", "dayName", "to", "comment"?, "sessionDate"? }
-    // sessionDate (opcional): fecha ISO de una sesión concreta registrada para
-    // ese día de rutina; si no se indica, se usa la más reciente.
-    // ---------------------------------------------------------------
-    if (path === "/admin/send-day-chart-email" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
-
-      const body = await request.json().catch(() => ({}));
-      const username = normalizeUsername(body.username);
-      const dayName = String(body.dayName || "").trim();
-      const to = String(body.to || "").trim();
-      const comment = String(body.comment || "").trim();
-      const sessionDate = body.sessionDate ? String(body.sessionDate).trim() : null;
-      if (!username) return err("Usuario inválido.");
-      if (!dayName) return err("Falta el día de rutina.");
-      if (!to) return err("Indica a qué email quieres enviarlo.");
-
-      const dataRaw = await env.ADEANFIT_KV.get("data:" + username);
-      if (!dataRaw) return err("Ese usuario no existe o no tiene datos.", 404);
-      const data = JSON.parse(dataRaw);
-
-      try {
-        const html = buildDayReportEmailHtml(username, data, dayName, comment, sessionDate);
-        await sendEmailViaResend(env, to, `Informe de entrenamiento — ${dayName} (${username})`, html);
-        return json({ ok: true, to });
-      } catch (e) {
-        return err("No se pudo enviar: " + e.message, 502);
-      }
-    }
-
-    // ---------------------------------------------------------------
-    // CLIENTE: enviarse a sí mismo por email la gráfica de un ejercicio
-    // concreto (desde la pestaña Progreso)  (POST /send-exercise-chart-email)
-    // Header: Authorization: Bearer <token>   Body: { "exerciseName", "to" }
-    // ---------------------------------------------------------------
-    if (path === "/send-exercise-chart-email" && request.method === "POST") {
-      const username = await getUserFromToken(env, request);
-      if (!username) return err("No autenticado.", 401);
-
-      const body = await request.json().catch(() => ({}));
-      const exerciseName = String(body.exerciseName || "").trim();
-      const to = String(body.to || "").trim();
-      if (!exerciseName) return err("Falta el ejercicio.");
-      if (!to) return err("Indica a qué email quieres enviarlo.");
-
-      const dataRaw = await env.ADEANFIT_KV.get("data:" + username);
-      if (!dataRaw) return err("No se encontraron tus datos.", 404);
-      const data = JSON.parse(dataRaw);
-
-      try {
-        const html = buildExerciseChartEmailHtml(username, data, exerciseName);
-        await sendEmailViaResend(env, to, `Tu progreso — ${exerciseName}`, html);
-        return json({ ok: true, to });
-      } catch (e) {
-        return err("No se pudo enviar: " + e.message, 502);
-      }
-    }
-
-    // ---------------------------------------------------------------
-    // CLIENTE: enviarse a sí mismo por email el informe completo de un día
-    // de rutina (desde la pestaña Progreso)  (POST /send-day-chart-email)
-    // Header: Authorization: Bearer <token>
-    // Body: { "dayName", "to", "sessionDate"? }
-    // (Sin comentario de entrenador: esta vía es solo para el propio cliente.)
-    // ---------------------------------------------------------------
-    if (path === "/send-day-chart-email" && request.method === "POST") {
-      const username = await getUserFromToken(env, request);
-      if (!username) return err("No autenticado.", 401);
-
-      const body = await request.json().catch(() => ({}));
-      const dayName = String(body.dayName || "").trim();
-      const to = String(body.to || "").trim();
-      const sessionDate = body.sessionDate ? String(body.sessionDate).trim() : null;
-      if (!dayName) return err("Falta el día de rutina.");
-      if (!to) return err("Indica a qué email quieres enviarlo.");
-
-      const dataRaw = await env.ADEANFIT_KV.get("data:" + username);
-      if (!dataRaw) return err("No se encontraron tus datos.", 404);
-      const data = JSON.parse(dataRaw);
-
-      try {
-        const html = buildDayReportEmailHtml(username, data, dayName, "", sessionDate);
-        await sendEmailViaResend(env, to, `Tu informe de entrenamiento — ${dayName}`, html);
+        let html, subject;
+        if (kind === "day") {
+          const dayName = String(body.dayName || "").trim();
+          if (!dayName) return err("Falta el día de rutina.");
+          const sessionDate = body.sessionDate ? String(body.sessionDate).trim() : null;
+          const comment = isAdmin ? String(body.comment || "").trim() : "";
+          html = buildDayReportEmailHtml(username, data, dayName, comment, sessionDate);
+          subject = isAdmin ? `Informe de entrenamiento — ${dayName} (${username})` : `Tu informe de entrenamiento — ${dayName}`;
+        } else if (kind === "exercise") {
+          const exerciseName = String(body.exerciseName || "").trim();
+          if (!exerciseName) return err("Falta el ejercicio.");
+          html = buildExerciseChartEmailHtml(username, data, exerciseName);
+          subject = isAdmin ? `Progreso de ${username} — ${exerciseName}` : `Tu progreso — ${exerciseName}`;
+        } else {
+          return err("Tipo de informe no válido.");
+        }
+        await sendEmailViaResend(env, to, subject, html);
         return json({ ok: true, to });
       } catch (e) {
         return err("No se pudo enviar: " + e.message, 502);
@@ -1625,8 +1565,7 @@ function buildProgressEmailHtml(username, data, frequency) {
     const expected = computeExpectedMaxEmail(profile, name);
     let expectedTxt = "";
     if (expected != null && last.kg > 0) {
-      const gap = Math.round((last.kg - expected) * 10) / 10;
-      expectedTxt = `<br><span style="font-size:12px;color:#999;">${arrowFor(gap)} ${gap >= 0 ? "+" : ""}${gap} kg frente a lo esperado para tu experiencia (${expected} kg)</span>`;
+      expectedTxt = expectedGapHtml(last.kg, expected, "tu");
     }
     return {
       name,
@@ -1654,15 +1593,8 @@ function buildProgressEmailHtml(username, data, frequency) {
     ` : `<p style="font-size:14px;color:#bbb;">No se ha registrado ningún ejercicio en ${periodLabel}.</p>`}
   `;
 
-  return `
-  <div style="font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;background:#0f0f10;padding:28px 24px;border-radius:14px;color:#f2f2f2;">
-    <h1 style="font-size:20px;margin:0 0 4px;color:#ff7a3d;">ADEANEASYFIT</h1>
-    <p style="margin:0 0 20px;font-size:13px;color:#999;">Resumen de progreso de <b>${escapeHtmlEmail(username)}</b></p>
-    <div style="background:#1a1a1c;border-radius:10px;padding:18px;color:#e8e8e8;">
-      ${bodyContent}
-    </div>
-    <p style="margin:20px 0 0;font-size:12px;color:#777;">Puedes cambiar la frecuencia de estos emails, o desactivarlos, desde la pestaña Progreso de la app.</p>
-  </div>`;
+  return emailShell(`Resumen de progreso de <b>${escapeHtmlEmail(username)}</b>`, bodyContent,
+    "Puedes cambiar la frecuencia de estos emails, o desactivarlos, desde la pestaña Progreso de la app.");
 }
 
 // Email con la gráfica de UN solo ejercicio de UN cliente — lo que usa el
@@ -1692,8 +1624,7 @@ function buildExerciseChartEmailHtml(username, data, exerciseName) {
     const diff = Math.round((last.kg - first.kg) * 10) / 10;
     let expectedTxt = "";
     if (expected != null) {
-      const gap = Math.round((last.kg - expected) * 10) / 10;
-      expectedTxt = `<br><span style="font-size:12px;color:#999;">${arrowFor(gap)} ${gap >= 0 ? "+" : ""}${gap} kg frente a lo esperado para su experiencia (${expected} kg)</span>`;
+      expectedTxt = expectedGapHtml(last.kg, expected, "su");
     }
     bodyContent = `
       <p style="margin:0 0 6px;font-size:15px;">Última marca: <b>${last.kg} kg</b> (${arrowFor(diff)} ${diff > 0 ? "+" : ""}${diff} kg desde el primer registro)${expectedTxt}</p>
@@ -1701,15 +1632,27 @@ function buildExerciseChartEmailHtml(username, data, exerciseName) {
     `;
   }
 
+  return emailShell(`Progreso de <b>${escapeHtmlEmail(username)}</b> en «${escapeHtmlEmail(exerciseName)}»`, bodyContent,
+    "Informe enviado desde ADEANEASYFIT.");
+}
+
+// Marco común de los emails de progreso (cabecera, tarjeta y pie).
+function emailShell(subtitleHtml, bodyContent, footer, maxWidth) {
   return `
-  <div style="font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;background:#0f0f10;padding:28px 24px;border-radius:14px;color:#f2f2f2;">
+  <div style="font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:${maxWidth || 520}px;margin:0 auto;background:#0f0f10;padding:28px 24px;border-radius:14px;color:#f2f2f2;">
     <h1 style="font-size:20px;margin:0 0 4px;color:#ff7a3d;">ADEANEASYFIT</h1>
-    <p style="margin:0 0 20px;font-size:13px;color:#999;">Progreso de <b>${escapeHtmlEmail(username)}</b> en «${escapeHtmlEmail(exerciseName)}»</p>
+    <p style="margin:0 0 20px;font-size:13px;color:#999;">${subtitleHtml}</p>
     <div style="background:#1a1a1c;border-radius:10px;padding:18px;color:#e8e8e8;">
       ${bodyContent}
     </div>
-    <p style="margin:20px 0 0;font-size:12px;color:#777;">Enviado desde el panel de administración de ADEANEASYFIT.</p>
+    <p style="margin:20px 0 0;font-size:12px;color:#777;">${footer}</p>
   </div>`;
+}
+
+// Línea "± X kg frente a lo esperado" (compartida por resumen periódico e informe de ejercicio).
+function expectedGapHtml(lastKg, expected, who) {
+  const gap = Math.round((lastKg - expected) * 10) / 10;
+  return `<br><span style="font-size:12px;color:#999;">${arrowFor(gap)} ${gap >= 0 ? "+" : ""}${gap} kg frente a lo esperado para ${who} experiencia (${expected} kg)</span>`;
 }
 
 function escapeHtmlEmail(s) {

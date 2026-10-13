@@ -2711,11 +2711,10 @@ function renderProgressPanelDetail(plan){
       if(!to){ msg.textContent = "Escribe a qué email quieres enviarlo."; msg.style.color = "var(--down)"; return; }
       sendBtn.disabled = true; sendBtn.textContent = "Enviando…";
       try{
-        if(progressPanelMode === "dia"){
-          await apiFetch("/send-day-chart-email", { method:"POST", body: JSON.stringify({ dayName, to, sessionDate: progressPanelSessionDate }) });
-        } else {
-          await apiFetch("/send-exercise-chart-email", { method:"POST", body: JSON.stringify({ exerciseName: name, to }) });
-        }
+        const payload = progressPanelMode === "dia"
+          ? { kind:"day", dayName, to, sessionDate: progressPanelSessionDate }
+          : { kind:"exercise", exerciseName: name, to };
+        await apiFetch("/send-report-email", { method:"POST", body: JSON.stringify(payload) });
         msg.textContent = "Enviado correctamente a " + to + ".";
         msg.style.color = "var(--steel)";
       }catch(e){

@@ -965,7 +965,6 @@ function fmtDateFull(iso){
   return `${dd}-${mm}-${d.getFullYear()}`;
 }
 
-function buildLineChartSvgOLD_UNUSED_placeholder(){ /* eliminado: se sustituyó por la version con brecha de expectativa mas arriba */ }
 
 const TIME_BRACKET_LABELS = { "0-3":"0-3 meses", "3-6":"3-6 meses", "6-12":"6-12 meses", "1-2a":"1-2 años", "+2a":"+2 años" };
 
@@ -977,18 +976,6 @@ function getExerciseDayNames(sessions, exerciseName){
     if(sess.exercises.some(e => e.name === exerciseName)) days.add(sess.dayName);
   });
   return Array.from(days);
-}
-
-function buildExerciseTimeSeriesAdmin(sessions, exerciseName){
-  const points = [];
-  sessions.forEach(sess => {
-    const ex = sess.exercises.find(e => e.name === exerciseName);
-    if(ex){
-      const mx = exerciseMaxWeight(ex.sets);
-      if(mx > 0) points.push(mx);
-    }
-  });
-  return points;
 }
 
 function statMatchesQueryAdmin(name, dayNames, q){
@@ -1744,7 +1731,7 @@ function renderClientPanel(){
         dayEmailBtn.disabled = true; dayEmailBtn.textContent = "Enviando…";
         const comment = ($("clientPanelDayComment") && $("clientPanelDayComment").value.trim()) || "";
         try{
-          await apiCall("/admin/send-day-chart-email", { method:"POST", body: JSON.stringify({ username: clientPanelCurrentUser, dayName: plan.days[clientPanelDayIndex].name, to, comment, sessionDate: clientPanelMode === "dia" ? clientPanelSessionDate : null }) });
+          await apiCall("/admin/send-report-email", { method:"POST", body: JSON.stringify({ kind:"day", username: clientPanelCurrentUser, dayName: plan.days[clientPanelDayIndex].name, to, comment, sessionDate: clientPanelMode === "dia" ? clientPanelSessionDate : null }) });
           showMsg(msg, "Enviado correctamente a " + to + ".", true);
         }catch(e){
           showMsg(msg, "No se pudo enviar: " + e.message, false);
@@ -1852,7 +1839,7 @@ function renderClientPanelExercise(){
       const btn = $("btnSendChartEmail");
       btn.disabled = true; btn.textContent = "Enviando…";
       try{
-        await apiCall("/admin/send-exercise-chart-email", { method:"POST", body: JSON.stringify({ username: clientPanelCurrentUser, exerciseName: name, to }) });
+        await apiCall("/admin/send-report-email", { method:"POST", body: JSON.stringify({ kind:"exercise", username: clientPanelCurrentUser, exerciseName: name, to }) });
         showMsg(msg, "Enviado correctamente a " + to + ".", true);
       }catch(e){
         showMsg(msg, "No se pudo enviar: " + e.message, false);
