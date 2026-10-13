@@ -23,3 +23,5 @@ jobs:
         with:
           node-version: 22
       - run: node scripts/comprobar.js
+      - name: Pruebas del worker (seguridad, datos, copias, emails)
+        run: node --test tests/worker.test.cjs

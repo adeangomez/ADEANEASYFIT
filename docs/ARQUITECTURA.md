@@ -7,6 +7,7 @@ assets/        Iconos, banner y fotos de la biblioteca de ejercicios (assets/eje
 worker.js      API en Cloudflare Workers (cuentas, datos, IA, emails)
 wrangler.toml  Configuración del Worker (base de datos KV, IA y tarea diaria)
 scripts/       Herramientas para trabajar en local
+tests/         Pruebas automáticas del worker
 docs/          Documentación
 ```
 

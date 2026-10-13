@@ -47,6 +47,60 @@ async function hashPassword(password, salt) {
   return sha256Hex(salt + ":" + password);
 }
 
+// ---- Protección contra adivinar contraseñas ----
+// Cuenta fallos en KV con caducidad. Al llegar al máximo se bloquea durante la ventana.
+const MAX_LOGIN_FAILS_USER = 5;      // por usuario
+const MAX_LOGIN_FAILS_IP = 30;       // por dirección IP (cubre varios usuarios)
+const MAX_ADMIN_FAILS_IP = 10;       // intentos fallidos con la clave de administrador
+const FAIL_WINDOW_SECONDS = 15 * 60; // 15 minutos
+const MIN_PASSWORD_LENGTH = 8;
+
+function clientIp(request) {
+  return request.headers.get("CF-Connecting-IP") || "desconocida";
+}
+
+async function failCount(env, key) {
+  const v = await env.ADEANFIT_KV.get(key);
+  return v ? parseInt(v, 10) || 0 : 0;
+}
+
+async function addFail(env, key) {
+  const n = (await failCount(env, key)) + 1;
+  await env.ADEANFIT_KV.put(key, String(n), { expirationTtl: FAIL_WINDOW_SECONDS });
+  return n;
+}
+
+function tooMany() {
+  return err("Demasiados intentos fallidos. Espera 15 minutos y vuelve a probar.", 429);
+}
+
+// Comparación que no revela por el tiempo cuántos caracteres acertaste.
+function safeEqual(a, b) {
+  const x = String(a || ""), y = String(b || "");
+  let diff = x.length ^ y.length;
+  const n = Math.max(x.length, y.length);
+  for (let i = 0; i < n; i++) diff |= (x.charCodeAt(i) || 0) ^ (y.charCodeAt(i) || 0);
+  return diff === 0;
+}
+
+// Devuelve null si la clave de administrador es correcta, o la respuesta de error si no.
+async function checkAdmin(env, request) {
+  const ipKey = "fail:admin:" + clientIp(request);
+  if ((await failCount(env, ipKey)) >= MAX_ADMIN_FAILS_IP) return tooMany();
+  const key = request.headers.get("X-Admin-Key") || "";
+  if (!env.ADMIN_KEY || !safeEqual(key, env.ADMIN_KEY)) {
+    await addFail(env, ipKey);
+    return err("No autorizado.", 401);
+  }
+  return null;
+}
+
+function passwordProblem(pw) {
+  if (!pw || pw.length < MIN_PASSWORD_LENGTH) return `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+  if (pw.length > 200) return "La contraseña es demasiado larga.";
+  return null;
+}
+
 function normalizeUsername(u) {
   return String(u || "").trim().toLowerCase();
 }
@@ -249,15 +303,16 @@ export default {
     // Body: { "username": "...", "password": "..." }
     // ---------------------------------------------------------------
     if (path === "/admin/create-user" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const username = normalizeUsername(body.username);
       const password = String(body.password || "");
 
       if (!username || username.length < 2) return err("Usuario inválido.");
-      if (!password || password.length < 4) return err("Contraseña demasiado corta (mínimo 4).");
+      const pwProblem = passwordProblem(password);
+      if (pwProblem) return err(pwProblem);
 
       const existing = await env.ADEANFIT_KV.get("user:" + username);
       if (existing) return err("Ese usuario ya existe.", 409);
@@ -278,8 +333,8 @@ export default {
     // Header: X-Admin-Key
     // ---------------------------------------------------------------
     if (path === "/admin/users" && request.method === "GET") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const list = await env.ADEANFIT_KV.list({ prefix: "user:" });
       const users = [];
@@ -298,8 +353,8 @@ export default {
     // Mantiene todos sus datos, pero le corta el acceso (login y sesiones activas).
     // ---------------------------------------------------------------
     if (path === "/admin/suspend-user" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const username = normalizeUsername(body.username);
@@ -317,8 +372,8 @@ export default {
     // Header: X-Admin-Key   Body: { "username": "..." }
     // ---------------------------------------------------------------
     if (path === "/admin/reactivate-user" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const username = normalizeUsername(body.username);
@@ -338,14 +393,15 @@ export default {
     // sin necesitar la contraseña anterior.
     // ---------------------------------------------------------------
     if (path === "/admin/reset-password" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const username = normalizeUsername(body.username);
       const newPassword = String(body.newPassword || "");
       if (!username) return err("Usuario inválido.");
-      if (!newPassword || newPassword.length < 4) return err("La nueva contraseña debe tener al menos 4 caracteres.");
+      const pwProblem = passwordProblem(newPassword);
+      if (pwProblem) return err(pwProblem);
 
       const raw = await env.ADEANFIT_KV.get("user:" + username);
       if (!raw) return err("Usuario no encontrado.", 404);
@@ -365,8 +421,8 @@ export default {
     // Header: X-Admin-Key   Body: { "username": "..." }
     // ---------------------------------------------------------------
     if (path === "/admin/delete-user" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const username = normalizeUsername(body.username);
@@ -382,8 +438,8 @@ export default {
     // Header: X-Admin-Key   Body: { "username": "..." }
     // ---------------------------------------------------------------
     if (path === "/admin/user-data" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const username = normalizeUsername(body.username);
@@ -407,8 +463,8 @@ export default {
     // esa rutina pasa a ser la activa (además de fijar el día).
     // ---------------------------------------------------------------
     if (path === "/admin/set-day" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const username = normalizeUsername(body.username);
@@ -445,8 +501,8 @@ export default {
     // (POST /admin/remove-avatar)  Header: X-Admin-Key   Body: { "username": "..." }
     // ---------------------------------------------------------------
     if (path === "/admin/remove-avatar" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const username = normalizeUsername(body.username);
@@ -474,8 +530,8 @@ export default {
     // del usuario y reinicia el día actual a 0.
     // ---------------------------------------------------------------
     if (path === "/admin/save-plan" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const username = normalizeUsername(body.username);
@@ -530,8 +586,8 @@ export default {
     // Header: X-Admin-Key   Body: { "username": "...", "planId": "..." }
     // ---------------------------------------------------------------
     if (path === "/admin/delete-plan" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const username = normalizeUsername(body.username);
@@ -565,8 +621,8 @@ export default {
     // otras rutinas, esta se añade a la lista (no sustituye nada).
     // ---------------------------------------------------------------
     if (path === "/admin/copy-plan" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const fromUsername = normalizeUsername(body.fromUsername);
@@ -619,8 +675,8 @@ export default {
     // guarda con /admin/save-plan.
     // ---------------------------------------------------------------
     if (path === "/admin/generate-plan-for-user" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const username = normalizeUsername(body.username);
@@ -645,12 +701,25 @@ export default {
       const username = normalizeUsername(body.username);
       const password = String(body.password || "");
 
+      const userFailKey = "fail:user:" + username;
+      const ipFailKey = "fail:ip:" + clientIp(request);
+      if ((await failCount(env, userFailKey)) >= MAX_LOGIN_FAILS_USER) return tooMany();
+      if ((await failCount(env, ipFailKey)) >= MAX_LOGIN_FAILS_IP) return tooMany();
+
       const raw = await env.ADEANFIT_KV.get("user:" + username);
-      if (!raw) return err("Usuario o contraseña incorrectos.", 401);
+      if (!raw) {
+        await addFail(env, ipFailKey);
+        return err("Usuario o contraseña incorrectos.", 401);
+      }
       const user = JSON.parse(raw);
 
       const hash = await hashPassword(password, user.salt);
-      if (hash !== user.hash) return err("Usuario o contraseña incorrectos.", 401);
+      if (!safeEqual(hash, user.hash)) {
+        await addFail(env, userFailKey);
+        await addFail(env, ipFailKey);
+        return err("Usuario o contraseña incorrectos.", 401);
+      }
+      await env.ADEANFIT_KV.delete(userFailKey);
 
       if (user.suspended) return err("Tu cuenta está suspendida. Contacta con el administrador.", 403);
 
@@ -672,7 +741,8 @@ export default {
       const body = await request.json().catch(() => ({}));
       const oldPassword = String(body.oldPassword || "");
       const newPassword = String(body.newPassword || "");
-      if (!newPassword || newPassword.length < 4) return err("La nueva contraseña debe tener al menos 4 caracteres.");
+      const pwProblem = passwordProblem(newPassword);
+      if (pwProblem) return err(pwProblem);
 
       const raw = await env.ADEANFIT_KV.get("user:" + username);
       if (!raw) return err("Usuario no encontrado.", 404);
@@ -961,8 +1031,8 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
     // Header: X-Admin-Key
     // ---------------------------------------------------------------
     if (path === "/admin/exercise-suggestions" && request.method === "GET") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const list = await env.ADEANFIT_KV.list({ prefix: "suggestion:" });
       const suggestions = [];
@@ -980,8 +1050,8 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
     // Header: X-Admin-Key   Body: { "id": "suggestion:..." }
     // ---------------------------------------------------------------
     if (path === "/admin/dismiss-suggestion" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const id = String(body.id || "");
@@ -996,8 +1066,8 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
     // Header: X-Admin-Key   Body: { "username": "...", "to": "..." (opcional) }
     // ---------------------------------------------------------------
     if (path === "/admin/send-progress-email-test" && request.method === "POST") {
-      const adminKey = request.headers.get("X-Admin-Key") || "";
-      if (adminKey !== env.ADMIN_KEY) return err("No autorizado.", 401);
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
 
       const body = await request.json().catch(() => ({}));
       const username = String(body.username || "").trim();
@@ -1041,7 +1111,7 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       const [isAdmin, fixedKind] = REPORT_ROUTES[path];
       let username;
       if (isAdmin) {
-        if ((request.headers.get("X-Admin-Key") || "") !== env.ADMIN_KEY) return err("No autorizado.", 401);
+        { const denied = await checkAdmin(env, request); if (denied) return denied; }
       } else {
         username = await getUserFromToken(env, request);
         if (!username) return err("No autenticado.", 401);
@@ -1082,6 +1152,52 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       } catch (e) {
         return err("No se pudo enviar: " + e.message, 502);
       }
+    }
+
+    // ---------------------------------------------------------------
+    // ADMIN: copia de seguridad de todos los usuarios y sus datos
+    //   GET  /admin/backup   -> JSON descargable
+    //   POST /admin/restore  -> { "backup": {...}, "confirm": true }
+    // Header: X-Admin-Key. La copia incluye las cuentas (con la contraseña
+    // ya cifrada) y todos sus datos; no incluye sesiones abiertas.
+    // ---------------------------------------------------------------
+    if (path === "/admin/backup" && request.method === "GET") {
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
+      const out = { version: 1, createdAt: new Date().toISOString(), users: {}, data: {} };
+      for (const [prefix, bucket] of [["user:", out.users], ["data:", out.data]]) {
+        let cursor;
+        do {
+          const page = await env.ADEANFIT_KV.list({ prefix, cursor });
+          for (const k of page.keys) {
+            const raw = await env.ADEANFIT_KV.get(k.name);
+            if (raw) bucket[k.name.slice(prefix.length)] = JSON.parse(raw);
+          }
+          cursor = page.list_complete ? undefined : page.cursor;
+        } while (cursor);
+      }
+      return json(out);
+    }
+
+    if (path === "/admin/restore" && request.method === "POST") {
+      const denied = await checkAdmin(env, request);
+      if (denied) return denied;
+      const body = await request.json().catch(() => ({}));
+      const b = body.backup;
+      if (body.confirm !== true) return err("Falta la confirmación.");
+      if (!b || b.version !== 1 || typeof b.users !== "object" || typeof b.data !== "object") return err("La copia no tiene un formato válido.");
+      let users = 0, datos = 0;
+      for (const [name, u] of Object.entries(b.users)) {
+        if (normalizeUsername(name) !== name || !u || typeof u.hash !== "string" || typeof u.salt !== "string") continue;
+        await env.ADEANFIT_KV.put("user:" + name, JSON.stringify(u));
+        users++;
+      }
+      for (const [name, d] of Object.entries(b.data)) {
+        if (normalizeUsername(name) !== name || !d || typeof d !== "object") continue;
+        await env.ADEANFIT_KV.put("data:" + name, JSON.stringify(d));
+        datos++;
+      }
+      return json({ ok: true, users, data: datos });
     }
 
     return err("Ruta no encontrada.", 404);

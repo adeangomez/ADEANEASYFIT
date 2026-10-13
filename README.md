@@ -99,6 +99,7 @@ assets/        Iconos, banner y fotos de ejercicios
 worker.js      API (Cloudflare Workers)
 wrangler.toml  Configuración del Worker
 scripts/       Herramientas para trabajar en local
+tests/         Pruebas automáticas del worker
 docs/          Arquitectura y despliegue
 .github/       Comprobación automática (CI)
 ```
@@ -106,7 +107,7 @@ docs/          Arquitectura y despliegue
 - [Arquitectura](docs/ARQUITECTURA.md): qué hace cada pieza y cómo se guardan los datos.
 - [Despliegue](docs/DESPLIEGUE.md): cómo se publica y cómo volver atrás si algo falla.
 
-**Antes de subir cambios:** `node scripts/comprobar.js`. La misma comprobación corre sola en cada subida.
+**Antes de subir cambios:** `node scripts/comprobar.js` (revisa la sintaxis y ejecuta las pruebas). La misma comprobación corre sola en cada subida.
 
 **Textos legales:** Política de Privacidad y Cookies, Aviso Legal y Condiciones de Uso, conforme al RGPD y a la LO 3/2018. Se abren desde el perfil de la app y hay que aceptarlos para entrar.
 

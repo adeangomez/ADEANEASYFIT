@@ -25,5 +25,14 @@ try {
   console.error("FALLO worker.js: " + String(e.stderr || e.message).split("\n").slice(0, 5).join("\n"));
 }
 
+// Pruebas automáticas del worker (seguridad, datos, copias de seguridad, emails)
+try {
+  execFileSync(process.execPath, ["--test", path.join(raiz, "tests", "worker.test.cjs")], { stdio: "pipe" });
+  console.log("OK    pruebas del worker");
+} catch (e) {
+  fallos++;
+  console.error("FALLO pruebas del worker:\n" + String(e.stdout || e.message).split("\n").filter(l => /not ok|error|expected|actual/i.test(l)).slice(0, 15).join("\n"));
+}
+
 if (fallos) { console.error(`\n${fallos} comprobación(es) con fallo.`); process.exit(1); }
 console.log("\nTodo correcto.");

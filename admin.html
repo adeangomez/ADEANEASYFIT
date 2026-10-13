@@ -209,6 +209,7 @@
     <div class="filter-row" style="margin-bottom:16px;">
       <button data-usv="crear">Crear usuario</button>
       <button data-usv="existentes">Usuarios existentes</button>
+      <button data-usv="copia">Copia de seguridad</button>
     </div>
 
     <div id="usersSubPlaceholder" style="color:var(--faint);font-size:12.5px;text-align:center;padding:30px 10px;">Elige una opción arriba para empezar.</div>
@@ -219,9 +220,21 @@
         <label>Usuario</label>
         <input id="newUsername" placeholder="p. ej. adrian" />
         <label>Contraseña</label>
-        <input id="newPassword" type="text" placeholder="mínimo 4 caracteres" />
+        <input id="newPassword" type="text" placeholder="mínimo 8 caracteres" />
         <button id="btnCreate">Crear usuario</button>
         <div class="msg" id="createMsg"></div>
+      </div>
+    </div>
+
+    <div id="usersSubCopia" style="display:none;">
+      <div class="card">
+        <h2>Copia de seguridad</h2>
+        <div style="font-size:12.5px;color:var(--faint);margin-bottom:14px;">Descarga un archivo con todos los usuarios y sus datos (rutinas, sesiones, perfil). Guárdalo en un sitio seguro: contiene datos de salud. Haz una copia antes de cualquier cambio importante.</div>
+        <button id="btnBackup">Descargar copia</button>
+        <label style="margin-top:18px;">Restaurar desde una copia</label>
+        <input type="file" id="restoreFile" accept="application/json,.json" />
+        <button class="secondary" id="btnRestore">Restaurar</button>
+        <div class="msg" id="backupMsg"></div>
       </div>
     </div>
 
@@ -386,6 +399,7 @@ document.querySelectorAll("[data-usv]").forEach(btn => {
     $("usersSubPlaceholder").style.display = "none";
     $("usersSubCrear").style.display = btn.dataset.usv === "crear" ? "block" : "none";
     $("usersSubExistentes").style.display = btn.dataset.usv === "existentes" ? "block" : "none";
+    $("usersSubCopia").style.display = btn.dataset.usv === "copia" ? "block" : "none";
     if(btn.dataset.usv === "existentes" && $("userList").children.length === 0){
       $("btnList").click();
     }
@@ -928,9 +942,9 @@ async function reactivateUser(username){
 }
 
 async function resetPasswordUser(username){
-  const newPassword = prompt(`Nueva contraseña para "${username}" (mínimo 4 caracteres):`);
+  const newPassword = prompt(`Nueva contraseña para "${username}" (mínimo 8 caracteres):`);
   if(newPassword === null) return; // cancelado
-  if(!newPassword || newPassword.length < 4){
+  if(!newPassword || newPassword.length < 8){
     alert("La contraseña debe tener al menos 4 caracteres.");
     return;
   }
@@ -1249,6 +1263,36 @@ $("btnSendTestEmail").addEventListener("click", async () => {
   }finally{
     btn.disabled = false;
     btn.textContent = prevText;
+  }
+});
+
+// -------------------- COPIA DE SEGURIDAD --------------------
+$("btnBackup").addEventListener("click", async () => {
+  const msg = $("backupMsg");
+  try{
+    const data = await apiCall("/admin/backup");
+    const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "adeaneasyfit-copia-" + new Date().toISOString().slice(0,10) + ".json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showMsg(msg, `Copia descargada: ${Object.keys(data.users).length} usuarios.`, true);
+  }catch(e){
+    showMsg(msg, "No se pudo crear la copia: " + e.message, false);
+  }
+});
+$("btnRestore").addEventListener("click", async () => {
+  const msg = $("backupMsg");
+  const file = $("restoreFile").files[0];
+  if(!file){ showMsg(msg, "Elige primero un archivo de copia.", false); return; }
+  if(!confirm("Esto sobrescribe los datos de los usuarios que estén en la copia. ¿Seguro que quieres restaurar?")) return;
+  try{
+    const backup = JSON.parse(await file.text());
+    const res = await apiCall("/admin/restore", { method:"POST", body: JSON.stringify({ backup, confirm: true }) });
+    showMsg(msg, `Restaurado: ${res.users} cuentas y ${res.data} conjuntos de datos.`, true);
+  }catch(e){
+    showMsg(msg, "No se pudo restaurar: " + e.message, false);
   }
 });
 
