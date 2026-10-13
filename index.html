@@ -2002,11 +2002,81 @@ function renderRestTimerWidget(){
   }
 }
 
+// Sonido del temporizador. Para que avise aunque la app no esté en primer
+// plano, el aviso se PROGRAMA al pulsar el botón (ahí el navegador sí permite
+// audio) en vez de generarse al terminar, y mientras corre el descanso se
+// reproduce un audio silencioso que evita que el móvil suspenda la página.
+let restAudioCtx = null;
+let restKeepAliveEl = null;
+let restSoundScheduled = false;
+let restSilentUrl = null;
+
+function restSilentWavUrl(){
+  if(restSilentUrl) return restSilentUrl;
+  const sr = 8000, n = sr; // 1 s de silencio, mono, 8 bits
+  const buf = new ArrayBuffer(44 + n);
+  const v = new DataView(buf);
+  const w = (o, s) => { for(let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); };
+  w(0,"RIFF"); v.setUint32(4, 36+n, true); w(8,"WAVE"); w(12,"fmt ");
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr,true); v.setUint16(32,1,true); v.setUint16(34,8,true);
+  w(36,"data"); v.setUint32(40,n,true);
+  const bytes = new Uint8Array(buf);
+  for(let i=44;i<44+n;i++) bytes[i] = 128;
+  let bin = ""; bytes.forEach(b => { bin += String.fromCharCode(b); });
+  restSilentUrl = "data:audio/wav;base64," + btoa(bin);
+  return restSilentUrl;
+}
+
+// Dos notas suaves y descendentes→ascendentes, volumen bajo (sutil).
+function softChime(ctx, startAt){
+  [[0, 660], [0.24, 880]].forEach(([delay, freq]) => {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = "sine"; o.frequency.value = freq;
+    const t0 = startAt + delay;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.1, t0 + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6);
+    o.start(t0); o.stop(t0 + 0.65);
+  });
+}
+
+function scheduleRestSound(seconds){
+  cancelRestSound();
+  try{
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(Ctx){
+      restAudioCtx = new Ctx();
+      if(restAudioCtx.state === "suspended") restAudioCtx.resume();
+      softChime(restAudioCtx, restAudioCtx.currentTime + seconds);
+      restSoundScheduled = true;
+    }
+  }catch(e){ restSoundScheduled = false; }
+  try{
+    restKeepAliveEl = new Audio(restSilentWavUrl());
+    restKeepAliveEl.loop = true;
+    const p = restKeepAliveEl.play();
+    if(p && p.catch) p.catch(()=>{});
+  }catch(e){}
+  try{
+    if("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+  }catch(e){}
+}
+
+function cancelRestSound(){
+  restSoundScheduled = false;
+  if(restKeepAliveEl){ try{ restKeepAliveEl.pause(); }catch(e){} restKeepAliveEl = null; }
+  if(restAudioCtx){ try{ restAudioCtx.close(); }catch(e){} restAudioCtx = null; }
+}
+
 function startRestTimer(seconds){
   restTimerTotalMs = seconds * 1000;
   restTimerEndAt = Date.now() + restTimerTotalMs;
   if(restTimerIntervalId) clearInterval(restTimerIntervalId);
   restTimerIntervalId = setInterval(renderRestTimerWidget, 250);
+  scheduleRestSound(seconds);
   renderRestTimerWidget();
 }
 
@@ -2015,28 +2085,30 @@ function stopRestTimer(finished){
   restTimerEndAt = null;
   restTimerTotalMs = null;
   renderRestTimerWidget();
-  if(finished){
-    if(navigator.vibrate) navigator.vibrate([200,100,200]);
+  if(!finished){ cancelRestSound(); return; }
+  if(navigator.vibrate) navigator.vibrate([200,100,200]);
+  if(restSoundScheduled){
+    // El aviso ya estaba programado: se deja sonar y se limpia después.
+    setTimeout(cancelRestSound, 2000);
+  } else {
     playRestTimerSound();
+    cancelRestSound();
   }
+  try{
+    if(document.hidden && "Notification" in window && Notification.permission === "granted"){
+      new Notification("Descanso terminado", { body: "Ya puedes empezar la siguiente serie.", tag: "rest-timer", silent: true });
+    }
+  }catch(e){}
 }
 
+// Respaldo si el navegador no permitió programar el sonido.
 function playRestTimerSound(){
   try{
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if(!Ctx) return;
     const ctx = new Ctx();
-    [0, 0.18].forEach(delay=>{
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.connect(g); g.connect(ctx.destination);
-      o.type = "sine"; o.frequency.value = 880;
-      const t0 = ctx.currentTime + delay;
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(0.35, t0 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
-      o.start(t0); o.stop(t0 + 0.35);
-    });
+    softChime(ctx, ctx.currentTime);
+    setTimeout(()=>{ try{ ctx.close(); }catch(e){} }, 1500);
   }catch(e){ /* silencioso si el navegador bloquea audio */ }
 }
 
