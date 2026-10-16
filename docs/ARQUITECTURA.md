@@ -28,13 +28,14 @@ docs/          Documentación
 
 - `profile`: peso, altura, experiencia, historial de peso, foto, preferencia de email y `consents` (aceptación de los textos legales con su versión).
 - `plans`: rutinas con días y ejercicios.
-- `state.sessions`: sesiones guardadas (`exercises → sets → kg y reps`).
+- `state.sessions`: sesiones guardadas (`exercises → sets → kg y reps`), con `startedAt` y `durationSec` cuando se midió la duración del entrenamiento.
 - `_rev`: número de revisión para detectar cambios hechos desde otro dispositivo.
 
 ## Los dos puntos de entrada de la API que más se usan
 
 - `GET/PUT /data`: carga y guarda los datos del usuario con sesión iniciada.
 - `POST /send-report-email` y `POST /admin/send-report-email`: informe de un día de rutina o de un ejercicio.
+- `POST /admin/send-client-excel`: Excel (.xlsx) con las marcas de un cliente, enviado como adjunto. El worker lo construye sin librerías (un .xlsx es un ZIP de XML) y descarga los gráficos de quickchart.io. Límites: 60 días y 24 gráficos por Excel, por el máximo de peticiones y de CPU por ejecución en Cloudflare.
 
 ## Textos legales
 

@@ -1155,6 +1155,45 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
     }
 
     // ---------------------------------------------------------------
+    // ADMIN: enviar por email un Excel con las marcas de un cliente
+    //   POST /admin/send-client-excel
+    //   Body: { username, to, rangeDays? (0 = todo, 30, 90, 180, 365) }
+    // ---------------------------------------------------------------
+    if (path === "/admin/send-client-excel" && request.method === "POST") {
+      { const denied = await checkAdmin(env, request); if (denied) return denied; }
+      const body = await request.json().catch(() => ({}));
+      const username = normalizeUsername(body.username);
+      if (!username) return err("Usuario inválido.");
+      const to = String(body.to || "").trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return err("Indica un email válido.");
+      const rangeDays = body.rangeDays === undefined ? 30 : Number(body.rangeDays);
+      if (!EXCEL_RANGES.includes(rangeDays)) return err("Periodo no válido.");
+
+      const dataRaw = await env.ADEANFIT_KV.get("data:" + username);
+      if (!dataRaw) return err("Ese usuario no existe o no tiene datos.", 404);
+      const data = JSON.parse(dataRaw);
+
+      try {
+        const { bytes, plan, charts } = await buildClientExcel(username, data, rangeDays);
+        if (plan.daySheets.length === 0) return err("Este cliente no tiene marcas registradas en ese periodo.", 404);
+        const rangoTxt = rangeDays > 0 ? `últimos ${rangeDays} días` : "todo el historial";
+        const html = emailShell(
+          `Marcas de <b>${escapeHtmlEmail(username)}</b> en Excel`,
+          `<p style="margin:0 0 8px;font-size:14px;">Adjunto el Excel con las marcas registradas (${rangoTxt}).</p>
+           <p style="margin:0;font-size:13px;color:#bbb;">${plan.daySheets.length} día${plan.daySheets.length === 1 ? "" : "s"} de entrenamiento, una hoja por día con ejercicios, series, repeticiones, pesos y ${charts} gráfico${charts === 1 ? "" : "s"}. La primera hoja es un resumen.</p>`,
+          "Enviado desde el panel de administración de ADEANEASYFIT.");
+        const stamp = new Date().toISOString().slice(0, 10);
+        await sendEmailViaResend(env, to, `Excel de marcas — ${username}`, html, [{
+          filename: `marcas-${username}-${stamp}.xlsx`,
+          content: bytesToBase64(bytes),
+        }]);
+        return json({ ok: true, to, sheets: plan.daySheets.length, charts, truncated: plan.truncated });
+      } catch (e) {
+        return err("No se pudo enviar: " + e.message, 502);
+      }
+    }
+
+    // ---------------------------------------------------------------
     // ADMIN: copia de seguridad de todos los usuarios y sus datos
     //   GET  /admin/backup   -> JSON descargable
     //   POST /admin/restore  -> { "backup": {...}, "confirm": true }
@@ -1255,7 +1294,7 @@ async function maybeSendProgressEmail(env, username, force) {
   return { sent: true };
 }
 
-async function sendEmailViaResend(env, to, subject, html) {
+async function sendEmailViaResend(env, to, subject, html, attachments) {
   if (!env.RESEND_API_KEY) throw new Error("Falta RESEND_API_KEY en las variables de entorno del Worker.");
   const resp = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -1268,6 +1307,7 @@ async function sendEmailViaResend(env, to, subject, html) {
       to: [to],
       subject,
       html,
+      ...(attachments && attachments.length ? { attachments } : {}),
     }),
   });
   if (!resp.ok) {
@@ -1400,9 +1440,9 @@ function shortDateEmail(iso) {
 // Genera la URL de una imagen de gráfico real (vía quickchart.io) para
 // incrustar directamente en el email con un <img> — no requiere ninguna
 // clave ni JavaScript en el cliente de correo, es una imagen normal.
-function quickChartUrl(chartConfig, width, height) {
+function quickChartUrl(chartConfig, width, height, pixelRatio = 2) {
   const encoded = encodeURIComponent(JSON.stringify(chartConfig));
-  return `https://quickchart.io/chart?width=${width}&height=${height}&devicePixelRatio=2&backgroundColor=%230f0f10&c=${encoded}`;
+  return `https://quickchart.io/chart?width=${width}&height=${height}&devicePixelRatio=${pixelRatio}&backgroundColor=%230f0f10&c=${encoded}`;
 }
 
 function weightChartImgTag(weightHistory) {
@@ -1434,8 +1474,9 @@ function weightChartImgTag(weightHistory) {
   return `<img src="${url}" width="500" height="220" alt="Gráfica de peso corporal" style="width:100%;max-width:500px;border-radius:8px;margin:10px 0 16px;">`;
 }
 
-function exerciseChartImgTag(name, points, expected) {
-  if (points.length < 2) return "";
+// Configuración del gráfico de evolución de un ejercicio (la comparten el
+// email y el Excel, para que se vean exactamente igual).
+function exerciseLineChartConfig(name, points, expected) {
   const datasets = [{
     label: name,
     data: points.map(p => p.kg),
@@ -1455,7 +1496,7 @@ function exerciseChartImgTag(name, points, expected) {
       fill: false,
     });
   }
-  const config = {
+  return {
     type: "line",
     data: { labels: points.map(p => shortDateEmail(p.date)), datasets },
     options: {
@@ -1466,7 +1507,11 @@ function exerciseChartImgTag(name, points, expected) {
       },
     },
   };
-  const url = quickChartUrl(config, 500, 220);
+}
+
+function exerciseChartImgTag(name, points, expected) {
+  if (points.length < 2) return "";
+  const url = quickChartUrl(exerciseLineChartConfig(name, points, expected), 500, 220);
   return `<img src="${url}" width="500" height="220" alt="Gráfica de ${escapeHtmlEmail(name)}" style="width:100%;max-width:500px;border-radius:8px;margin:10px 0 4px;">`;
 }
 
@@ -1497,22 +1542,18 @@ function dayExerciseColorMap(setRows) {
 // serie. El ancho de la imagen crece con el número de series para que
 // ninguna barra quede aplastada o invisible cuando hay muchos
 // ejercicios/series en la sesión.
-function dayBarChartImgTag(setRows) {
-  const withExpected = setRows.filter(r => r.expected != null);
-  if (withExpected.length === 0) return "";
+function dayBarChartConfig(setRows) {
+  const hasExpected = setRows.some(r => r.expected != null);
   const labels = setRows.map(r => `${r.shortName} S${r.setNum}`);
   const width = Math.min(1400, Math.max(600, setRows.length * 55));
   const colorMap = dayExerciseColorMap(setRows);
   const realColors = setRows.map(r => colorMap[r.exerciseName]);
+  const datasets = [];
+  if (hasExpected) datasets.push({ label: "Sombra esperada", data: setRows.map(r => r.expected), backgroundColor: "rgba(255,122,61,0.30)" });
+  datasets.push({ label: "Carga real", data: setRows.map(r => r.kg), backgroundColor: realColors });
   const config = {
     type: "bar",
-    data: {
-      labels,
-      datasets: [
-        { label: "Sombra esperada", data: setRows.map(r => r.expected), backgroundColor: "rgba(255,122,61,0.30)" },
-        { label: "Carga real", data: setRows.map(r => r.kg), backgroundColor: realColors },
-      ],
-    },
+    data: { labels, datasets },
     options: {
       plugins: { legend: { display: true, labels: { color: "#ccc" } } },
       scales: {
@@ -1521,6 +1562,12 @@ function dayBarChartImgTag(setRows) {
       },
     },
   };
+  return { config, width };
+}
+
+function dayBarChartImgTag(setRows) {
+  if (!setRows.some(r => r.expected != null)) return "";
+  const { config, width } = dayBarChartConfig(setRows);
   const url = quickChartUrl(config, width, 280);
   return `<img src="${url}" width="${width}" height="280" alt="Comparativa de carga real vs. esperada" style="width:100%;max-width:${width}px;border-radius:8px;margin:10px 0 16px;">`;
 }
@@ -1769,6 +1816,354 @@ function emailShell(subtitleHtml, bodyContent, footer, maxWidth) {
 function expectedGapHtml(lastKg, expected, who) {
   const gap = Math.round((lastKg - expected) * 10) / 10;
   return `<br><span style="font-size:12px;color:#999;">${arrowFor(gap)} ${gap >= 0 ? "+" : ""}${gap} kg frente a lo esperado para ${who} experiencia (${expected} kg)</span>`;
+}
+
+// =====================================================================
+// EXCEL DEL CLIENTE (.xlsx)
+// Se genera aquí mismo, sin librerías externas: un .xlsx es un ZIP con
+// varios XML. Una hoja "Resumen" y una hoja por día entrenado, con la tabla
+// de ejercicios/series/reps/kg y los gráficos de ese día.
+// =====================================================================
+const EXCEL_MAX_SESSIONS = 60;  // hojas máximas (las más recientes)
+const EXCEL_MAX_IMAGES = 24;    // gráficos máximos (límite de peticiones externas y de CPU)
+const EXCEL_RANGES = [0, 30, 90, 180, 365]; // días hacia atrás; 0 = todo
+
+let CRC_TABLE = null;
+function crc32(bytes) {
+  if (!CRC_TABLE) {
+    CRC_TABLE = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      CRC_TABLE[n] = c >>> 0;
+    }
+  }
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) crc = CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// ZIP sin compresión ("stored"): válido para Excel y muy barato de generar.
+function zipStore(files) {
+  const enc = new TextEncoder();
+  const now = new Date();
+  const dosTime = (now.getUTCHours() << 11) | (now.getUTCMinutes() << 5) | (now.getUTCSeconds() >> 1);
+  const dosDate = (((now.getUTCFullYear() - 1980) & 0x7F) << 9) | ((now.getUTCMonth() + 1) << 5) | now.getUTCDate();
+  const entries = files.map(f => ({
+    nameBytes: enc.encode(f.name),
+    data: typeof f.data === "string" ? enc.encode(f.data) : f.data,
+  }));
+  entries.forEach(e => { e.crc = crc32(e.data); });
+
+  let size = 22;
+  entries.forEach(e => { size += 30 + e.nameBytes.length + e.data.length + 46 + e.nameBytes.length; });
+  const out = new Uint8Array(size);
+  const dv = new DataView(out.buffer);
+  let pos = 0;
+  const u16 = v => { dv.setUint16(pos, v, true); pos += 2; };
+  const u32 = v => { dv.setUint32(pos, v, true); pos += 4; };
+
+  entries.forEach(e => {
+    e.offset = pos;
+    u32(0x04034b50); u16(20); u16(0x0800); u16(0); u16(dosTime); u16(dosDate);
+    u32(e.crc); u32(e.data.length); u32(e.data.length); u16(e.nameBytes.length); u16(0);
+    out.set(e.nameBytes, pos); pos += e.nameBytes.length;
+    out.set(e.data, pos); pos += e.data.length;
+  });
+  const cdStart = pos;
+  entries.forEach(e => {
+    u32(0x02014b50); u16(20); u16(20); u16(0x0800); u16(0); u16(dosTime); u16(dosDate);
+    u32(e.crc); u32(e.data.length); u32(e.data.length); u16(e.nameBytes.length);
+    u16(0); u16(0); u16(0); u16(0); u32(0); u32(e.offset);
+    out.set(e.nameBytes, pos); pos += e.nameBytes.length;
+  });
+  const cdSize = pos - cdStart;
+  u32(0x06054b50); u16(0); u16(0); u16(entries.length); u16(entries.length); u32(cdSize); u32(cdStart); u16(0);
+  return out;
+}
+
+// Base64 de bytes. Escrito a mano (con la función nativa si el motor la tiene)
+// porque es lo que más CPU gasta al generar el Excel y el plan gratuito de
+// Cloudflare tiene un límite de CPU por petición muy ajustado.
+const B64_ALPHABET = new Uint8Array(Array.from("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", c => c.charCodeAt(0)));
+function bytesToBase64(bytes) {
+  if (typeof bytes.toBase64 === "function") return bytes.toBase64();
+  const n = bytes.length, full = n - (n % 3), out = new Uint8Array(Math.ceil(n / 3) * 4);
+  const T = B64_ALPHABET;
+  let o = 0, i = 0;
+  for (; i < full; i += 3) {
+    const v = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
+    out[o++] = T[v >> 18]; out[o++] = T[(v >> 12) & 63]; out[o++] = T[(v >> 6) & 63]; out[o++] = T[v & 63];
+  }
+  const rest = n - full;
+  if (rest === 1) {
+    const v = bytes[i] << 16;
+    out[o++] = T[v >> 18]; out[o++] = T[(v >> 12) & 63]; out[o++] = 61; out[o++] = 61;
+  } else if (rest === 2) {
+    const v = (bytes[i] << 16) | (bytes[i + 1] << 8);
+    out[o++] = T[v >> 18]; out[o++] = T[(v >> 12) & 63]; out[o++] = T[(v >> 6) & 63]; out[o++] = 61;
+  }
+  return new TextDecoder("latin1").decode(out);
+}
+
+function xmlEsc(s) {
+  return String(s == null ? "" : s)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function colLetter(i) { // 0 -> A
+  let s = "";
+  for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+  return s;
+}
+
+// Fecha dd/mm/aaaa en hora de España (para que una sesión de madrugada no caiga en el día anterior).
+function madridDMY(iso) {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Madrid", day: "2-digit", month: "2-digit", year: "numeric" }).formatToParts(new Date(iso));
+  const get = t => (parts.find(p => p.type === t) || {}).value || "";
+  return `${get("day")}/${get("month")}/${get("year")}`;
+}
+
+function durationEs(sec) {
+  if (typeof sec !== "number" || !isFinite(sec) || sec < 0) return "";
+  const m = Math.round(sec / 60);
+  if (m < 1) return "< 1 min";
+  const h = Math.floor(m / 60);
+  return h === 0 ? `${m} min` : `${h} h ${String(m % 60).padStart(2, "0")} min`;
+}
+
+function uniqueSheetName(wanted, used) {
+  let base = String(wanted).replace(/[\[\]:*?\/\\]/g, "-").replace(/^'+|'+$/g, "").trim().slice(0, 31) || "Hoja";
+  let name = base, n = 2;
+  while (used.has(name.toLowerCase())) {
+    const suffix = ` (${n++})`;
+    name = base.slice(0, 31 - suffix.length) + suffix;
+  }
+  used.add(name.toLowerCase());
+  return name;
+}
+
+// Convierte los datos del cliente en un "plano" de libro: hojas con celdas e imágenes pedidas.
+// No hace ninguna petición externa, así se puede probar sin red.
+function planClientExcel(username, data, rangeDays) {
+  const profile = data.profile || {};
+  const allSessions = ((data.state && data.state.sessions) || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+  let sessions = allSessions;
+  if (rangeDays > 0) {
+    const cutoff = Date.now() - rangeDays * 86400000;
+    sessions = sessions.filter(s => new Date(s.date).getTime() >= cutoff);
+  }
+  const truncated = sessions.length > EXCEL_MAX_SESSIONS;
+  sessions = sessions.slice(0, EXCEL_MAX_SESSIONS);
+
+  const used = new Set(["resumen"]);
+  const daySheets = [];
+  sessions.forEach(session => {
+    const setRows = [];
+    (session.exercises || []).forEach(ex => {
+      const expected = computeExpectedMaxEmail(profile, ex.name);
+      const shortName = ex.name.length > 22 ? ex.name.slice(0, 20) + "…" : ex.name;
+      (ex.sets || []).forEach((st, i) => {
+        if ((st.kg || 0) <= 0 && (st.reps || 0) <= 0) return;
+        setRows.push({ exerciseName: ex.name, shortName, setNum: i + 1, reps: st.reps || 0, kg: st.kg || 0, expected });
+      });
+    });
+    if (setRows.length === 0) return; // sesión guardada en blanco: no aporta marcas
+    const fecha = madridDMY(session.date);
+    const sheetName = uniqueSheetName(`${fecha.replace(/\//g, "-")} ${session.dayName || "Entreno"}`, used);
+    daySheets.push({ sheetName, session, fecha, setRows, images: [] });
+  });
+
+  // Gráficos: primero el de cada día; con el cupo que quede, la evolución de cada ejercicio.
+  let budget = EXCEL_MAX_IMAGES;
+  daySheets.forEach(sh => {
+    if (budget <= 0) return;
+    const { config, width } = dayBarChartConfig(sh.setRows);
+    sh.images.push({ label: "Carga real frente a la sombra esperada, por serie", url: quickChartUrl(config, width, 280, 1), w: width, h: 280 });
+    budget--;
+  });
+  daySheets.forEach(sh => {
+    const names = [];
+    sh.setRows.forEach(r => { if (!names.includes(r.exerciseName)) names.push(r.exerciseName); });
+    names.forEach(name => {
+      if (budget <= 0) return;
+      const points = [];
+      allSessions.forEach(s => {
+        if (new Date(s.date) > new Date(sh.session.date)) return; // evolución hasta ese día
+        const ex = (s.exercises || []).find(e => e.name === name);
+        if (!ex) return;
+        const mx = (ex.sets || []).reduce((m, st) => Math.max(m, st.kg || 0), 0);
+        if (mx > 0) points.push({ date: s.date, kg: mx });
+      });
+      points.sort((a, b) => new Date(a.date) - new Date(b.date));
+      const last = points.slice(-20);
+      if (last.length < 2) return;
+      const expected = computeExpectedMaxEmail(profile, name);
+      sh.images.push({ label: `Evolución de «${name}» (peso máximo por sesión)`, url: quickChartUrl(exerciseLineChartConfig(name, last, expected), 600, 260, 1), w: 600, h: 260 });
+      budget--;
+    });
+  });
+
+  return { username, rangeDays, truncated, totalSessionsInRange: sessions.length, daySheets };
+}
+
+function textCell(ref, text, style) {
+  return `<c r="${ref}"${style ? ` s="${style}"` : ""} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(text)}</t></is></c>`;
+}
+function numCell(ref, n, style) {
+  return `<c r="${ref}"${style ? ` s="${style}"` : ""}><v>${n}</v></c>`;
+}
+function sheetXml(rows, colWidths, hasDrawing) {
+  const cols = colWidths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("");
+  const body = rows.map(r => `<row r="${r.n}">${r.cells.join("")}</row>`).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${cols}</cols><sheetData>${body}</sheetData>${hasDrawing ? '<drawing r:id="rId1"/>' : ""}</worksheet>`;
+}
+
+const XLSX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="4"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FFFF5A2E"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFF7A3D"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+// Índices de estilo: 1 negrita · 2 cabecera naranja · 3 título · 4 centrado · 5 negrita centrado
+
+// Monta el .xlsx. images: array paralelo a plan.daySheets[i].images con { bytes } o null si falló.
+function renderClientXlsx(plan, imageBytes) {
+  const { daySheets, username } = plan;
+  const files = [];
+  const sheetParts = []; // { name, xml, drawing? }
+
+  // ---- Hoja Resumen ----
+  const sumRows = [];
+  sumRows.push({ n: 1, cells: [textCell("A1", `ADEANEASYFIT · Marcas de ${username}`, 3)] });
+  const rangoTxt = plan.rangeDays > 0 ? `últimos ${plan.rangeDays} días` : "todo el historial";
+  sumRows.push({ n: 2, cells: [textCell("A2", `Periodo: ${rangoTxt} · ${daySheets.length} día${daySheets.length === 1 ? "" : "s"} con marcas · generado el ${madridDMY(new Date().toISOString())}`)] });
+  const head = ["Fecha", "Día", "Rutina", "Duración", "Ejercicios", "Series", "Carga total (kg)"];
+  sumRows.push({ n: 4, cells: head.map((h, i) => textCell(colLetter(i) + "4", h, 2)) });
+  let r = 5;
+  daySheets.forEach(sh => {
+    const exCount = new Set(sh.setRows.map(x => x.exerciseName)).size;
+    const total = Math.round(sh.setRows.reduce((s, x) => s + x.kg, 0) * 10) / 10;
+    sumRows.push({ n: r, cells: [
+      textCell("A" + r, sh.fecha), textCell("B" + r, sh.session.dayName || ""), textCell("C" + r, sh.session.planName || ""),
+      textCell("D" + r, durationEs(sh.session.durationSec) || "—", 4), numCell("E" + r, exCount, 4), numCell("F" + r, sh.setRows.length, 4), numCell("G" + r, total, 4),
+    ] });
+    r++;
+  });
+  const notes = [];
+  if (plan.truncated) notes.push(`Solo se incluyen los ${EXCEL_MAX_SESSIONS} días más recientes del periodo.`);
+  const sinGrafico = daySheets.filter(sh => sh.images.length === 0).length;
+  if (sinGrafico > 0) notes.push(`${sinGrafico} día(s) sin gráficos para no superar el límite de ${EXCEL_MAX_IMAGES} imágenes por Excel. Pide un periodo más corto para verlos todos.`);
+  r++;
+  notes.forEach(t => { sumRows.push({ n: r, cells: [textCell("A" + r, t)] }); r++; });
+  sheetParts.push({ name: "Resumen", xml: sheetXml(sumRows, [14, 28, 24, 14, 12, 10, 18], false) });
+
+  // ---- Una hoja por día ----
+  let imgCounter = 0;
+  const drawings = [];
+  daySheets.forEach((sh, idx) => {
+    const rows = [];
+    rows.push({ n: 1, cells: [textCell("A1", `${sh.session.dayName || "Entrenamiento"} · ${username}`, 3)] });
+    rows.push({ n: 2, cells: [textCell("A2", "Fecha:", 1), textCell("B2", sh.fecha), textCell("C2", "Duración:", 1), textCell("D2", durationEs(sh.session.durationSec) || "—")] });
+    if (sh.session.planName) rows.push({ n: 3, cells: [textCell("A3", "Rutina:", 1), textCell("B3", sh.session.planName)] });
+    const header = ["Ejercicio", "Serie", "Repeticiones", "Peso (kg)", "Sombra esperada (kg)", "Diferencia (kg)"];
+    rows.push({ n: 5, cells: header.map((h, i) => textCell(colLetter(i) + "5", h, 2)) });
+    let row = 6;
+    sh.setRows.forEach(x => {
+      const cells = [textCell("A" + row, x.exerciseName), numCell("B" + row, x.setNum, 4), numCell("C" + row, x.reps, 4), numCell("D" + row, x.kg, 4)];
+      if (x.expected != null) {
+        cells.push(numCell("E" + row, x.expected, 4));
+        cells.push(numCell("F" + row, Math.round((x.kg - x.expected) * 10) / 10, 4));
+      }
+      rows.push({ n: row, cells });
+      row++;
+    });
+    const first = 6, last = row - 1;
+    const totalKg = Math.round(sh.setRows.reduce((s, x) => s + x.kg, 0) * 10) / 10;
+    const totalReps = sh.setRows.reduce((s, x) => s + x.reps, 0);
+    rows.push({ n: row, cells: [
+      textCell("A" + row, "Totales", 1), numCell("B" + row, sh.setRows.length, 5),
+      `<c r="C${row}" s="5"><f>SUM(C${first}:C${last})</f><v>${totalReps}</v></c>`,
+      `<c r="D${row}" s="5"><f>SUM(D${first}:D${last})</f><v>${totalKg}</v></c>`,
+    ] });
+    let cursor = row + 2;
+
+    // Gráficos de esa hoja que se pudieron descargar
+    const anchors = [];
+    sh.images.forEach((img, k) => {
+      const bytes = imageBytes[idx] && imageBytes[idx][k];
+      if (!bytes) {
+        rows.push({ n: cursor, cells: [textCell("A" + cursor, `${img.label}: gráfico no disponible en este envío.`)] });
+        cursor += 2;
+        return;
+      }
+      rows.push({ n: cursor, cells: [textCell("A" + cursor, img.label, 1)] });
+      imgCounter++;
+      files.push({ name: `xl/media/image${imgCounter}.png`, data: bytes });
+      anchors.push({ rowIndex: cursor, w: img.w, h: img.h, media: `image${imgCounter}.png` });
+      cursor += Math.ceil(img.h / 20) + 2;
+    });
+
+    const part = { name: sh.sheetName, xml: null, drawing: null };
+    if (anchors.length) {
+      const dn = drawings.length + 1;
+      drawings.push({ n: dn, anchors });
+      part.drawing = dn;
+    }
+    part.xml = sheetXml(rows, [34, 10, 16, 14, 22, 18], anchors.length > 0);
+    sheetParts.push(part);
+  });
+
+  // ---- Piezas del paquete ----
+  const NS_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  const sheetsXml = sheetParts.map((p, i) => `<sheet name="${xmlEsc(p.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("");
+  files.push({ name: "[Content_Types].xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheetParts.map((p, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}${drawings.map(d => `<Override PartName="/xl/drawings/drawing${d.n}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`).join("")}</Types>` });
+  files.push({ name: "_rels/.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${NS_R}/officeDocument" Target="xl/workbook.xml"/></Relationships>` });
+  files.push({ name: "xl/workbook.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${NS_R}"><sheets>${sheetsXml}</sheets></workbook>` });
+  files.push({ name: "xl/_rels/workbook.xml.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheetParts.map((p, i) => `<Relationship Id="rId${i + 1}" Type="${NS_R}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}<Relationship Id="rId${sheetParts.length + 1}" Type="${NS_R}/styles" Target="styles.xml"/></Relationships>` });
+  files.push({ name: "xl/styles.xml", data: XLSX_STYLES });
+  sheetParts.forEach((p, i) => {
+    files.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: p.xml });
+    if (p.drawing) {
+      files.push({ name: `xl/worksheets/_rels/sheet${i + 1}.xml.rels`, data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${NS_R}/drawing" Target="../drawings/drawing${p.drawing}.xml"/></Relationships>` });
+    }
+  });
+  drawings.forEach(d => {
+    const anchorsXml = d.anchors.map((a, k) => {
+      const cx = a.w * 9525, cy = a.h * 9525;
+      return `<xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${a.rowIndex}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx="${cx}" cy="${cy}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${k + 2}" name="Gráfico ${k + 1}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId${k + 1}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
+    }).join("");
+    files.push({ name: `xl/drawings/drawing${d.n}.xml`, data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="${NS_R}">${anchorsXml}</xdr:wsDr>` });
+    files.push({ name: `xl/drawings/_rels/drawing${d.n}.xml.rels`, data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${d.anchors.map((a, k) => `<Relationship Id="rId${k + 1}" Type="${NS_R}/image" Target="../media/${a.media}"/>`).join("")}</Relationships>` });
+  });
+  return zipStore(files);
+}
+
+// Descarga un gráfico PNG de quickchart.io; null si falla (el Excel sale igual, sin ese gráfico).
+async function fetchChartPng(url) {
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!resp.ok) return null;
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    const isPng = bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
+    return isPng ? bytes : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function buildClientExcel(username, data, rangeDays, imageFetcher) {
+  const plan = planClientExcel(username, data, rangeDays);
+  const fetcher = imageFetcher || fetchChartPng;
+  const imageBytes = await Promise.all(plan.daySheets.map(sh => Promise.all(sh.images.map(img => fetcher(img.url)))));
+  const bytes = renderClientXlsx(plan, imageBytes);
+  const charts = imageBytes.reduce((n, arr) => n + arr.filter(Boolean).length, 0);
+  return { bytes, plan, charts };
 }
 
 function escapeHtmlEmail(s) {

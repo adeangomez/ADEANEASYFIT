@@ -903,6 +903,13 @@ async function loadUsers(){
         resetBtn.addEventListener("click", () => resetPasswordUser(username));
         btnGroup.appendChild(resetBtn);
 
+        const excelBtn = document.createElement("button");
+        excelBtn.className = "secondary";
+        excelBtn.textContent = "Enviar Excel";
+        excelBtn.title = "Envía a tu correo un Excel con las marcas de este cliente";
+        excelBtn.addEventListener("click", () => toggleExcelPanel(li, username));
+        btnGroup.appendChild(excelBtn);
+
         const delBtn = document.createElement("button");
         delBtn.className = "danger";
         delBtn.textContent = "Eliminar";
@@ -920,6 +927,52 @@ async function loadUsers(){
   }catch(e){
     showMsg(msg, "Error: " + e.message, false);
   }
+}
+
+// Panel desplegable bajo cada usuario: elige periodo y correo, y el servidor
+// envía un Excel (una hoja por día con ejercicios, series, reps, pesos y gráficos).
+function toggleExcelPanel(li, username){
+  const existing = li.querySelector(".excel-panel");
+  if(existing){ existing.remove(); return; }
+  const savedEmail = localStorage.getItem("adeanfit_admin_notify_email") || "";
+  const panel = document.createElement("div");
+  panel.className = "excel-panel";
+  panel.style.cssText = "flex-basis:100%;width:100%;margin-top:6px;";
+  panel.innerHTML = `
+    <label>Periodo a incluir</label>
+    <select class="excel-range">
+      <option value="30">Últimos 30 días</option>
+      <option value="90">Últimos 90 días</option>
+      <option value="180">Últimos 6 meses</option>
+      <option value="365">Último año</option>
+      <option value="0">Todo el historial</option>
+    </select>
+    <div class="copy-row" style="margin-top:8px;">
+      <input type="email" class="excel-to" placeholder="tu-email@ejemplo.com" value="${escapeAttrAdmin(savedEmail)}" style="margin-bottom:0;">
+      <button type="button" class="excel-send">Enviar Excel</button>
+    </div>
+    <div class="msg excel-msg"></div>`;
+  li.appendChild(panel);
+  const sendBtn = panel.querySelector(".excel-send");
+  const msg = panel.querySelector(".excel-msg");
+  sendBtn.addEventListener("click", async () => {
+    const to = panel.querySelector(".excel-to").value.trim();
+    if(!to){ showMsg(msg, "Escribe a qué email quieres enviarlo.", false); return; }
+    localStorage.setItem("adeanfit_admin_notify_email", to);
+    const rangeDays = parseInt(panel.querySelector(".excel-range").value, 10);
+    sendBtn.disabled = true; sendBtn.textContent = "Generando…";
+    showMsg(msg, "Generando el Excel y sus gráficos; puede tardar unos segundos…", true);
+    try{
+      const r = await apiCall("/admin/send-client-excel", { method:"POST", body: JSON.stringify({ username, to, rangeDays }) });
+      let txt = `Enviado a ${to}: ${r.sheets} día${r.sheets===1?"":"s"} con ${r.charts} gráfico${r.charts===1?"":"s"}.`;
+      if(r.truncated) txt += " Se incluyen solo los 60 días más recientes del periodo.";
+      showMsg(msg, txt, true);
+    }catch(e){
+      showMsg(msg, "No se pudo enviar: " + e.message, false);
+    } finally {
+      sendBtn.disabled = false; sendBtn.textContent = "Enviar Excel";
+    }
+  });
 }
 
 async function suspendUser(username){
@@ -945,7 +998,7 @@ async function resetPasswordUser(username){
   const newPassword = prompt(`Nueva contraseña para "${username}" (mínimo 8 caracteres):`);
   if(newPassword === null) return; // cancelado
   if(!newPassword || newPassword.length < 8){
-    alert("La contraseña debe tener al menos 4 caracteres.");
+    alert("La contraseña debe tener al menos 8 caracteres.");
     return;
   }
   try{
@@ -971,6 +1024,13 @@ let adminExpandedIds = new Set();
 
 function exerciseVolume(sets){
   return (sets || []).reduce((sum, s) => sum + (s.kg || 0) * (s.reps || 0), 0);
+}
+function fmtWorkoutDuration(sec){
+  if(typeof sec !== "number" || !isFinite(sec) || sec < 0) return "";
+  const totalMin = Math.round(sec / 60);
+  if(totalMin < 1) return "< 1 min";
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  return h === 0 ? `${m} min` : `${h} h ${String(m).padStart(2,"0")} min`;
 }
 function fmtDateFull(iso){
   const d = new Date(iso);
@@ -1133,7 +1193,7 @@ function renderAdminStrengthView(username, data){
     html += `<div class="hist-card">
       <div class="hist-card-top" data-toggle="${sess.id}">
         <div>
-          <div class="hist-card-date">${fmtDateFull(sess.date)}</div>
+          <div class="hist-card-date">${fmtDateFull(sess.date)}${sess.durationSec ? ` · ⏱ ${fmtWorkoutDuration(sess.durationSec)}` : ""}</div>
           <div class="hist-card-day">${sess.dayName}${sess.planName ? ` · ${sess.planName}` : ""}</div>
         </div>
         <span class="chev ${isOpen ? "open" : ""}">›</span>

@@ -67,6 +67,8 @@ Por cada ejercicio con datos verás:
 
 Cada sesión aparece con fecha exacta (DD-MM-AAAA), rutina y día. Tócala para desplegar el desglose serie a serie (kg × reps de cada una).
 
+**Duración del entrenamiento**: el cronómetro arranca solo al registrar la primera marca (escrita a mano o con el tick) y se detiene al guardar la sesión. En el historial ves el tiempo estimado (⏱) junto a la fecha. Si recargas la app a mitad de entrenamiento, el reloj sigue donde iba.
+
 Cada sesión tiene un botón de eliminar. Si borras tu **sesión más reciente** de la rutina activa, el circuito **retrocede un día automáticamente** — pensado justo para corregir un guardado accidental sin liar el resto del historial.
 
 ### 6. Para el administrador
@@ -75,6 +77,7 @@ Desde `admin.html`, con tu clave de administrador:
 - Crear usuarios nuevos (usuario + contraseña)
 - **Suspender** una cuenta (le corta el acceso sin borrar sus datos) y **reactivarla** cuando quieras, o **eliminarla** del todo
 - **Progreso de usuarios**: elige cualquier cuenta y consulta su historial completo y una gráfica de su evolución total, sin necesidad de que esa persona te enseñe su móvil
+- **Enviar Excel**: en cada usuario de la lista, el botón "Enviar Excel" manda a tu correo un `.xlsx` con las marcas de ese cliente (30/90 días, 6 meses, 1 año o todo). Primera hoja de resumen y una hoja por día entrenado, con ejercicios, series, repeticiones, pesos, duración y los gráficos de ese día
 
 </details>
 

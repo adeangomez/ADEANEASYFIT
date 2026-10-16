@@ -5,7 +5,7 @@ const path = require("path");
 function cargarWorker() {
   let src = fs.readFileSync(path.join(__dirname, "..", "worker.js"), "utf8");
   src = src.replace("export default {", "const __worker = {");
-  src += "\nreturn { worker: __worker, buildDayReportEmailHtml, buildExerciseChartEmailHtml, buildProgressEmailHtml, computeExpectedMaxEmail, passwordProblem, safeEqual };";
+  src += "\nreturn { worker: __worker, buildDayReportEmailHtml, buildExerciseChartEmailHtml, buildProgressEmailHtml, computeExpectedMaxEmail, passwordProblem, safeEqual, crc32, zipStore, bytesToBase64, planClientExcel, buildClientExcel };";
   return new Function(src)();
 }
 

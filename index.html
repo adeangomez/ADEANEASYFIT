@@ -293,6 +293,8 @@
   .filter-row button{ flex-shrink:0; background:var(--card-2); border:1px solid var(--line); color:var(--text-dim); padding:8px 14px; border-radius:100px; font-size:12px; font-weight:700; cursor:pointer; }
   .filter-row button.active{ background: var(--iron); color:#1a0b06; border-color:var(--iron); }
 
+  .workout-clock{ text-align:center; font-family:'JetBrains Mono'; font-size:12px; font-weight:600; color:var(--text-faint); margin-bottom:8px; letter-spacing:0.02em; }
+  .hist-dur{ color:var(--iron); }
   .hist-item{ background:var(--card); border:1px solid var(--line-soft); border-radius:var(--radius); margin-bottom:10px; overflow:hidden; }
   .hist-top{ display:flex; justify-content:space-between; align-items:center; padding:14px 14px 14px 16px; gap:10px; cursor:pointer; transition: background .15s; }
   .hist-top:hover{ background: rgba(255,255,255,0.025); }
@@ -1833,6 +1835,68 @@ const TRAIN_DRAFT_MAX_AGE_MS = 60 * 60 * 1000; // 1 hora
 function trainDraftKey(){
   return "adeanfit_draft_" + (currentUser || "anon");
 }
+// -----------------------------------------------------------------------
+// Duración del entrenamiento: el reloj arranca solo con la PRIMERA marca
+// que escribes (o rellenas con el tick) y se detiene al guardar la sesión.
+// Se guarda también en el dispositivo para que sobreviva a una recarga.
+// -----------------------------------------------------------------------
+const WORKOUT_START_MAX_AGE_MS = 6 * 60 * 60 * 1000; // pasadas 6 h se considera abandonado
+let workoutStartMem = null;
+function workoutStartKey(){
+  return "adeanfit_wstart_" + (currentUser || "anon");
+}
+function readWorkoutStart(){
+  let w = workoutStartMem;
+  if(!w){
+    try{
+      const raw = localStorage.getItem(workoutStartKey());
+      if(raw) w = JSON.parse(raw);
+    }catch(e){ w = null; }
+  }
+  if(!w || typeof w.startedAt !== "number") return null;
+  if(Date.now() - w.startedAt > WORKOUT_START_MAX_AGE_MS){ clearWorkoutStart(); return null; }
+  // Solo vale para la misma rutina y el mismo día que se estaban haciendo.
+  if(w.planId !== (activePlanId || null) || w.dayIndex !== state.currentDayIndex) return null;
+  return w;
+}
+function startWorkoutClockIfNeeded(){
+  if(readWorkoutStart()) return; // ya está en marcha
+  const w = { startedAt: Date.now(), planId: activePlanId || null, dayIndex: state.currentDayIndex };
+  workoutStartMem = w;
+  try{ localStorage.setItem(workoutStartKey(), JSON.stringify(w)); }catch(e){}
+}
+function clearWorkoutStart(){
+  workoutStartMem = null;
+  try{ localStorage.removeItem(workoutStartKey()); }catch(e){}
+}
+// 3725 s -> "1 h 02 min"; 52 min -> "52 min"; menos de un minuto -> "< 1 min"
+function fmtWorkoutDuration(sec){
+  if(typeof sec !== "number" || !isFinite(sec) || sec < 0) return "";
+  const totalMin = Math.round(sec / 60);
+  if(totalMin < 1) return "< 1 min";
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  if(h === 0) return `${m} min`;
+  return `${h} h ${String(m).padStart(2,"0")} min`;
+}
+function fmtClock(ms){
+  const t = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+  const mm = String(m).padStart(2,"0"), ss = String(s).padStart(2,"0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+function startWorkoutClockDisplay(){
+  const el = document.getElementById("workoutClock");
+  if(!el) return;
+  const timer = setInterval(tick, 1000);
+  function tick(){
+    if(!document.body.contains(el)){ clearInterval(timer); return; }
+    const w = readWorkoutStart();
+    el.style.display = w ? "" : "none";
+    if(w) el.textContent = "⏱ Entrenando: " + fmtClock(Date.now() - w.startedAt);
+  }
+  tick();
+}
+
 function saveTrainDraft(day){
   try{
     const inputs = document.querySelectorAll("#sessionForm input");
@@ -1850,8 +1914,10 @@ function saveTrainDraft(day){
     });
     if(!hasAny){
       localStorage.removeItem(trainDraftKey());
+      clearWorkoutStart(); // sin ninguna marca no hay entrenamiento en curso
       return;
     }
+    startWorkoutClockIfNeeded(); // primera marca registrada: arranca el reloj
     const draft = {
       planId: activePlanId || null,
       dayIndex: state.currentDayIndex,
@@ -1869,7 +1935,7 @@ function readTrainDraft(){
     const draft = JSON.parse(raw);
     if(!draft || typeof draft !== "object") return null;
     if(Date.now() - draft.savedAt > TRAIN_DRAFT_MAX_AGE_MS){
-      localStorage.removeItem(trainDraftKey());
+      clearTrainDraft();
       return null;
     }
     return draft;
@@ -1877,6 +1943,7 @@ function readTrainDraft(){
 }
 function clearTrainDraft(){
   try{ localStorage.removeItem(trainDraftKey()); }catch(e){}
+  clearWorkoutStart();
 }
 function restoreTrainDraft(day){
   const draft = readTrainDraft();
@@ -2078,6 +2145,7 @@ function renderTrain(){
   `;
   html += `
       <div class="save-bar">
+        <div id="workoutClock" class="workout-clock" style="display:none;"></div>
         <button type="submit" class="btn-primary" id="saveSessionBtn">Guardar entrenamiento y pasar al siguiente día</button>
         <div class="hint">Al guardar se registra la sesión de <b>${day.name}</b> y el circuito avanza automáticamente a <b>${days[(state.currentDayIndex+1)%days.length].name}</b>. Puedes tocar cualquier día del carril de arriba para cambiarlo manualmente.</div>
       </div>
@@ -2089,6 +2157,7 @@ function renderTrain(){
   wireTrainDraftAutosave(day);
   wireTodayEditControls(day);
   startSaveCooldownTimer();
+  startWorkoutClockDisplay();
   const reminderBtn = document.getElementById("weightReminderBtn");
   if(reminderBtn) reminderBtn.addEventListener("click", ()=> showUpdateWeightModal());
   const reminderClose = document.getElementById("weightReminderClose");
@@ -2305,9 +2374,15 @@ async function onSaveSession(e){
   if(submitBtn){ submitBtn.disabled = true; submitBtn.textContent = "Guardando…"; }
 
   try{
+    // Duración: desde la primera marca hasta este momento (solo si hubo marcas).
+    const workoutStart = hasAnyData ? readWorkoutStart() : null;
     const session = {
       id: Date.now(),
       date: new Date().toISOString(),
+      ...(workoutStart ? {
+        startedAt: new Date(workoutStart.startedAt).toISOString(),
+        durationSec: Math.max(1, Math.round((Date.now() - workoutStart.startedAt) / 1000))
+      } : {}),
       dayIndex: state.currentDayIndex,
       dayName: day.name,
       planId: plan ? plan.id : null,
@@ -3012,7 +3087,7 @@ function renderHistory(){
     html += `<div class="hist-item">
       <div class="hist-top" data-toggle="${sess.id}">
         <div style="flex:1;min-width:0;">
-          <div class="hist-date-line">${fmtDateFull(sess.date)}</div>
+          <div class="hist-date-line">${fmtDateFull(sess.date)}${sess.durationSec ? ` · <span class="hist-dur">⏱ ${fmtWorkoutDuration(sess.durationSec)}</span>` : ``}</div>
           <div class="hist-day">${sess.dayName}${sess.planName ? ` <span class="hist-plan">· ${sess.planName}</span>` : ``}</div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
