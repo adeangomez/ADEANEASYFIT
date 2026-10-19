@@ -935,38 +935,49 @@ function toggleExcelPanel(li, username){
   const existing = li.querySelector(".excel-panel");
   if(existing){ existing.remove(); return; }
   const savedEmail = localStorage.getItem("adeanfit_admin_notify_email") || "";
+  // Día base por defecto: hace un mes (fecha local, formato AAAA-MM-DD)
+  const d0 = new Date(); d0.setMonth(d0.getMonth() - 1);
+  const defaultStart = d0.getFullYear() + "-" + String(d0.getMonth()+1).padStart(2,"0") + "-" + String(d0.getDate()).padStart(2,"0");
   const panel = document.createElement("div");
   panel.className = "excel-panel";
   panel.style.cssText = "flex-basis:100%;width:100%;margin-top:6px;";
   panel.innerHTML = `
-    <label>Periodo a incluir</label>
-    <select class="excel-range">
-      <option value="30">Últimos 30 días</option>
-      <option value="90">Últimos 90 días</option>
-      <option value="180">Últimos 6 meses</option>
-      <option value="365">Último año</option>
-      <option value="0">Todo el historial</option>
-    </select>
-    <div class="copy-row" style="margin-top:8px;">
+    <label>Día base (se envía un mes desde esa fecha)</label>
+    <input type="date" class="excel-start" value="${defaultStart}" style="margin-bottom:4px;">
+    <div class="excel-hint" style="font-size:11.5px;color:var(--faint);margin-bottom:8px;"></div>
+    <div class="copy-row" style="margin-top:4px;">
       <input type="email" class="excel-to" placeholder="tu-email@ejemplo.com" value="${escapeAttrAdmin(savedEmail)}" style="margin-bottom:0;">
       <button type="button" class="excel-send">Enviar Excel</button>
     </div>
     <div class="msg excel-msg"></div>`;
   li.appendChild(panel);
+  const startInput = panel.querySelector(".excel-start");
+  const hint = panel.querySelector(".excel-hint");
+  const fmt = (d) => String(d.getDate()).padStart(2,"0") + "/" + String(d.getMonth()+1).padStart(2,"0") + "/" + d.getFullYear();
+  // Mismo día del mes siguiente (el último del mes si no existe) menos un día = último día incluido
+  function updateHint(){
+    const v = startInput.value;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){ hint.textContent = ""; return; }
+    const [y, m, d] = v.split("-").map(Number);
+    const lastDayNext = new Date(y, m + 1, 0).getDate();
+    const end = new Date(y, m, Math.min(d, lastDayNext) - 1);
+    hint.textContent = "Se incluirán las sesiones del " + fmt(new Date(y, m - 1, d)) + " al " + fmt(end) + ".";
+  }
+  startInput.addEventListener("input", updateHint);
+  updateHint();
   const sendBtn = panel.querySelector(".excel-send");
   const msg = panel.querySelector(".excel-msg");
   sendBtn.addEventListener("click", async () => {
     const to = panel.querySelector(".excel-to").value.trim();
+    const startDate = startInput.value;
+    if(!startDate){ showMsg(msg, "Elige el día base.", false); return; }
     if(!to){ showMsg(msg, "Escribe a qué email quieres enviarlo.", false); return; }
     localStorage.setItem("adeanfit_admin_notify_email", to);
-    const rangeDays = parseInt(panel.querySelector(".excel-range").value, 10);
     sendBtn.disabled = true; sendBtn.textContent = "Generando…";
     showMsg(msg, "Generando el Excel y sus gráficos; puede tardar unos segundos…", true);
     try{
-      const r = await apiCall("/admin/send-client-excel", { method:"POST", body: JSON.stringify({ username, to, rangeDays }) });
-      let txt = `Enviado a ${to}: ${r.sheets} día${r.sheets===1?"":"s"} con ${r.charts} gráfico${r.charts===1?"":"s"}.`;
-      if(r.truncated) txt += " Se incluyen solo los 60 días más recientes del periodo.";
-      showMsg(msg, txt, true);
+      const r = await apiCall("/admin/send-client-excel", { method:"POST", body: JSON.stringify({ username, to, startDate }) });
+      showMsg(msg, `Enviado a ${to}: ${r.sheets} día${r.sheets===1?"":"s"} con ${r.charts} gráfico${r.charts===1?"":"s"} (del ${r.from} al ${r.until}).`, true);
     }catch(e){
       showMsg(msg, "No se pudo enviar: " + e.message, false);
     } finally {

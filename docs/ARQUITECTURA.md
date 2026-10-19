@@ -35,7 +35,7 @@ docs/          Documentación
 
 - `GET/PUT /data`: carga y guarda los datos del usuario con sesión iniciada.
 - `POST /send-report-email` y `POST /admin/send-report-email`: informe de un día de rutina o de un ejercicio.
-- `POST /admin/send-client-excel`: Excel (.xlsx) con las marcas de un cliente, enviado como adjunto. El worker lo construye sin librerías (un .xlsx es un ZIP de XML) y descarga el gráfico general de cada sesión de quickchart.io. Límites: 60 días y 40 gráficos por Excel, por el máximo de peticiones y de CPU por ejecución en Cloudflare.
+- `POST /admin/send-client-excel`: Excel (.xlsx) con las marcas de un cliente, enviado como adjunto. El worker lo construye sin librerías (un .xlsx es un ZIP de XML) y descarga el gráfico general de cada sesión de quickchart.io. Se envía un mes desde un día base (`startDate`, en hora de España): así el trabajo por ejecución queda acotado (máx. ~31 hojas y 40 gráficos), dentro de los límites de peticiones y de CPU del plan gratuito de Cloudflare.
 
 ## Textos legales
 

@@ -1157,7 +1157,7 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
     // ---------------------------------------------------------------
     // ADMIN: enviar por email un Excel con las marcas de un cliente
     //   POST /admin/send-client-excel
-    //   Body: { username, to, rangeDays? (0 = todo, 30, 90, 180, 365) }
+    //   Body: { username, to, startDate: "AAAA-MM-DD" }  -> manda un mes desde ese día (incluido)
     // ---------------------------------------------------------------
     if (path === "/admin/send-client-excel" && request.method === "POST") {
       { const denied = await checkAdmin(env, request); if (denied) return denied; }
@@ -1166,28 +1166,27 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       if (!username) return err("Usuario inválido.");
       const to = String(body.to || "").trim();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return err("Indica un email válido.");
-      const rangeDays = body.rangeDays === undefined ? 30 : Number(body.rangeDays);
-      if (!EXCEL_RANGES.includes(rangeDays)) return err("Periodo no válido.");
+      const startDate = String(body.startDate || "").trim();
+      if (!isValidYmd(startDate)) return err("Elige el día desde el que quieres enviar las marcas.");
 
       const dataRaw = await env.ADEANFIT_KV.get("data:" + username);
       if (!dataRaw) return err("Ese usuario no existe o no tiene datos.", 404);
       const data = JSON.parse(dataRaw);
 
       try {
-        const { bytes, plan, charts } = await buildClientExcel(username, data, rangeDays);
-        if (plan.daySheets.length === 0) return err("Este cliente no tiene marcas registradas en ese periodo.", 404);
-        const rangoTxt = rangeDays > 0 ? `últimos ${rangeDays} días` : "todo el historial";
+        const { bytes, plan, charts } = await buildClientExcel(username, data, startDate);
+        if (plan.daySheets.length === 0) return err(`Este cliente no tiene marcas registradas entre el ${plan.fromDMY} y el ${plan.toDMY}.`, 404);
+        const rangoTxt = `del ${plan.fromDMY} al ${plan.toDMY}`;
         const html = emailShell(
           `Marcas de <b>${escapeHtmlEmail(username)}</b> en Excel`,
           `<p style="margin:0 0 8px;font-size:14px;">Adjunto el Excel con las marcas registradas (${rangoTxt}).</p>
            <p style="margin:0;font-size:13px;color:#bbb;">${plan.daySheets.length} día${plan.daySheets.length === 1 ? "" : "s"} de entrenamiento, una hoja por día con ejercicios, series, repeticiones, pesos y el gráfico general de la sesión. La primera hoja es un resumen.</p>`,
           "Enviado desde el panel de administración de ADEANEASYFIT.");
-        const stamp = new Date().toISOString().slice(0, 10);
         await sendEmailViaResend(env, to, `Excel de marcas — ${username}`, html, [{
-          filename: `marcas-${username}-${stamp}.xlsx`,
+          filename: `marcas-${username}-${startDate}.xlsx`,
           content: bytesToBase64(bytes),
         }]);
-        return json({ ok: true, to, sheets: plan.daySheets.length, charts, truncated: plan.truncated });
+        return json({ ok: true, to, sheets: plan.daySheets.length, charts, from: plan.fromDMY, until: plan.toDMY });
       } catch (e) {
         return err("No se pudo enviar: " + e.message, 502);
       }
@@ -1832,9 +1831,8 @@ function expectedGapHtml(lastKg, expected, who) {
 // varios XML. Una hoja "Resumen" y una hoja por día entrenado, con la tabla
 // de ejercicios/series/reps/kg y los gráficos de ese día.
 // =====================================================================
-const EXCEL_MAX_SESSIONS = 60;  // hojas máximas (las más recientes)
+const EXCEL_MAX_SESSIONS = 62;  // hojas máximas (un mes con dos sesiones diarias)
 const EXCEL_MAX_IMAGES = 40;    // gráficos máximos (límite de peticiones externas y de CPU)
-const EXCEL_RANGES = [0, 30, 90, 180, 365]; // días hacia atrás; 0 = todo
 
 let CRC_TABLE = null;
 function crc32(bytes) {
@@ -1952,16 +1950,42 @@ function uniqueSheetName(wanted, used) {
   return name;
 }
 
+// ---- Fechas "AAAA-MM-DD" en hora de España ----
+function isValidYmd(str) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(str || ""));
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (y < 2000 || y > 2100) return false;
+  const t = new Date(Date.UTC(y, mo - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d;
+}
+function madridYmd(iso) {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Madrid", day: "2-digit", month: "2-digit", year: "numeric" }).formatToParts(new Date(iso));
+  const get = t => (parts.find(p => p.type === t) || {}).value || "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+// Mismo día del mes siguiente (si no existe, el último día de ese mes): 15-10 -> 15-11; 31-01 -> 28/29-02.
+function addOneMonthYmd(ymd) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+  const last = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
+  return `${ny}-${String(nm).padStart(2, "0")}-${String(Math.min(d, last)).padStart(2, "0")}`;
+}
+function dayBeforeYmd(ymd) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+}
+function ymdToDMY(ymd) { const [y, m, d] = ymd.split("-"); return `${d}/${m}/${y}`; }
+
 // Convierte los datos del cliente en un "plano" de libro: hojas con celdas e imágenes pedidas.
+// Incluye las sesiones desde startDate (incluido) hasta un mes después (sin incluir ese día).
 // No hace ninguna petición externa, así se puede probar sin red.
-function planClientExcel(username, data, rangeDays) {
+function planClientExcel(username, data, startDate) {
   const profile = data.profile || {};
-  const allSessions = ((data.state && data.state.sessions) || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date));
-  let sessions = allSessions;
-  if (rangeDays > 0) {
-    const cutoff = Date.now() - rangeDays * 86400000;
-    sessions = sessions.filter(s => new Date(s.date).getTime() >= cutoff);
-  }
+  const endExclusive = addOneMonthYmd(startDate);
+  let sessions = ((data.state && data.state.sessions) || []).slice()
+    .filter(s => { const k = madridYmd(s.date); return k >= startDate && k < endExclusive; })
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
   const truncated = sessions.length > EXCEL_MAX_SESSIONS;
   sessions = sessions.slice(0, EXCEL_MAX_SESSIONS);
 
@@ -1991,7 +2015,7 @@ function planClientExcel(username, data, rangeDays) {
     sh.images.push({ label: "Gráfico general de la sesión: carga real frente a la sombra esperada, por serie", url: quickChartUrl(config, width, 280, 1), w: width, h: 280 });
     budget--;
   });
-  return { username, rangeDays, truncated, totalSessionsInRange: sessions.length, daySheets };
+  return { username, startDate, fromDMY: ymdToDMY(startDate), toDMY: ymdToDMY(dayBeforeYmd(endExclusive)), truncated, daySheets };
 }
 
 function textCell(ref, text, style) {
@@ -2042,7 +2066,7 @@ function renderClientXlsx(plan, imageBytes) {
   // ---- Hoja Resumen ----
   const sumRows = [];
   sumRows.push({ n: 1, cells: [textCell("A1", `ADEANEASYFIT · Marcas de ${username}`, 3)] });
-  const rangoTxt = plan.rangeDays > 0 ? `últimos ${plan.rangeDays} días` : "todo el historial";
+  const rangoTxt = `del ${plan.fromDMY} al ${plan.toDMY}`;
   sumRows.push({ n: 2, cells: [textCell("A2", `Periodo: ${rangoTxt} · ${daySheets.length} día${daySheets.length === 1 ? "" : "s"} con marcas · generado el ${madridDMY(new Date().toISOString())}`)] });
   const head = ["Fecha", "Día", "Rutina", "Duración", "Ejercicios", "Series", "Carga total (kg)"];
   sumRows.push({ n: 4, cells: head.map((h, i) => textCell(colLetter(i) + "4", h, 2)) });
@@ -2057,9 +2081,9 @@ function renderClientXlsx(plan, imageBytes) {
     r++;
   });
   const notes = [];
-  if (plan.truncated) notes.push(`Solo se incluyen los ${EXCEL_MAX_SESSIONS} días más recientes del periodo.`);
+  if (plan.truncated) notes.push(`Solo se incluyen las ${EXCEL_MAX_SESSIONS} sesiones más recientes del periodo.`);
   const sinGrafico = daySheets.filter(sh => sh.images.length === 0).length;
-  if (sinGrafico > 0) notes.push(`${sinGrafico} día(s) sin gráficos para no superar el límite de ${EXCEL_MAX_IMAGES} imágenes por Excel. Pide un periodo más corto para verlos todos.`);
+  if (sinGrafico > 0) notes.push(`${sinGrafico} día(s) sin gráficos para no superar el límite de ${EXCEL_MAX_IMAGES} imágenes por Excel. Elige una fecha de inicio más reciente para verlos todos.`);
   r++;
   notes.forEach(t => { sumRows.push({ n: r, cells: [textCell("A" + r, t)] }); r++; });
   sheetParts.push({ name: "Resumen", xml: sheetXml(sumRows, [14, 28, 24, 14, 12, 10, 18], false) });
@@ -2171,8 +2195,8 @@ async function fetchChartPng(url) {
   }
 }
 
-async function buildClientExcel(username, data, rangeDays, imageFetcher) {
-  const plan = planClientExcel(username, data, rangeDays);
+async function buildClientExcel(username, data, startDate, imageFetcher) {
+  const plan = planClientExcel(username, data, startDate);
   const fetcher = imageFetcher || fetchChartPng;
   const imageBytes = await Promise.all(plan.daySheets.map(sh => Promise.all(sh.images.map(img => fetcher(img.url)))));
   const bytes = renderClientXlsx(plan, imageBytes);

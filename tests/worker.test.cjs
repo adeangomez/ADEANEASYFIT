@@ -245,17 +245,37 @@ test("zip: las entradas se pueden leer de vuelta con su CRC correcto", () => {
   assert.equal(w.crc32(new TextEncoder().encode("123456789")), 0xCBF43926); // valor estándar de CRC-32
 });
 
-test("excel: respeta el periodo, salta sesiones en blanco y pide gráficos", () => {
-  const plan = w.planClientExcel("ana", datosExcel(), 30);
-  assert.equal(plan.daySheets.length, 2); // fuera: la de hace 400 días y la sesión vacía
+function ymdHace(dias) { return new Date(Date.now() - dias * 86400000).toISOString().slice(0, 10); }
+
+test("excel: manda un mes desde el día base, salta sesiones en blanco y pide un gráfico por hoja", () => {
+  const plan = w.planClientExcel("ana", datosExcel(), ymdHace(25)); // sesiones de hace 20 y 10 días; la de hace 5 está en blanco
+  assert.equal(plan.daySheets.length, 2);
   assert.equal(plan.daySheets[0].session.durationSec, 3725); // la más reciente primero
   assert.ok(plan.daySheets.every(sh => sh.setRows.every(r => r.kg > 0 || r.reps > 0)));
-  assert.ok(plan.daySheets.every(sh => sh.images.length === 1 && sh.images[0].url.startsWith("https://quickchart.io/"))); // solo el gráfico general de la sesión
-  assert.equal(w.planClientExcel("ana", datosExcel(), 0).daySheets.length, 3);
+  assert.ok(plan.daySheets.every(sh => sh.images.length === 1 && sh.images[0].url.startsWith("https://quickchart.io/"))); // solo el gráfico general
+  // Con el día base a 15 días, solo entra la de hace 10 días (la de hace 20 queda antes del inicio)
+  assert.equal(w.planClientExcel("ana", datosExcel(), ymdHace(15)).daySheets.length, 1);
+});
+
+test("excel: el periodo es un mes natural desde el día base (inicio incluido, mismo día del mes siguiente excluido)", () => {
+  const datos = { profile: {}, state: { sessions: ["2026-10-14", "2026-10-15", "2026-11-14", "2026-11-15"].map((f, i) => ({ id: String(i), date: f + "T10:00:00Z", dayName: "D" + i, exercises: [{ name: "X", sets: [{ kg: 1, reps: 1 }] }] })) } };
+  const plan = w.planClientExcel("ana", datos, "2026-10-15");
+  assert.deepEqual(plan.daySheets.map(s => s.session.dayName).sort(), ["D1", "D2"]); // 15-oct y 14-nov
+  assert.equal(plan.fromDMY, "15/10/2026");
+  assert.equal(plan.toDMY, "14/11/2026");
+  assert.equal(w.planClientExcel("ana", datos, "2026-01-31").toDMY, "27/02/2026"); // fin de mes: 31-ene -> 28-feb excluido
+  assert.equal(w.planClientExcel("ana", datos, "2026-12-15").toDMY, "14/01/2027"); // cambio de año
+});
+
+test("excel: las fechas se interpretan en hora de España (una sesión de madrugada cuenta en su día)", () => {
+  // 23:30 UTC del 14-oct son las 01:30 del 15-oct en España
+  const datos = { profile: {}, state: { sessions: [{ id: "1", date: "2026-10-14T23:30:00Z", dayName: "Noche", exercises: [{ name: "X", sets: [{ kg: 1, reps: 1 }] }] }] } };
+  assert.equal(w.planClientExcel("ana", datos, "2026-10-15").daySheets.length, 1);
+  assert.equal(w.planClientExcel("ana", datos, "2026-10-16").daySheets.length, 0);
 });
 
 test("excel: se genera un .xlsx con resumen, una hoja por día, datos y gráficos", async () => {
-  const { bytes, plan, charts } = await w.buildClientExcel("ana", datosExcel(), 30, async () => PNG_FALSO);
+  const { bytes, plan, charts } = await w.buildClientExcel("ana", datosExcel(), ymdHace(25), async () => PNG_FALSO);
   const f = leerZip(bytes);
   assert.ok(f["[Content_Types].xml"] && f["xl/workbook.xml"] && f["xl/styles.xml"]);
   const libro = Buffer.from(f["xl/workbook.xml"]).toString("utf8");
@@ -270,7 +290,7 @@ test("excel: se genera un .xlsx con resumen, una hoja por día, datos y gráfico
 });
 
 test("excel: si un gráfico no se puede descargar, el Excel sale igual avisándolo", async () => {
-  const { bytes, charts } = await w.buildClientExcel("ana", datosExcel(), 30, async () => null);
+  const { bytes, charts } = await w.buildClientExcel("ana", datosExcel(), ymdHace(25), async () => null);
   assert.equal(charts, 0);
   const f = leerZip(bytes);
   assert.ok(Buffer.from(f["xl/worksheets/sheet2.xml"]).toString("utf8").includes("gráfico no disponible"));
@@ -282,7 +302,7 @@ test("excel: nombres de hoja válidos y sin repetir, y texto con caracteres espe
     { id: "1", date: "2026-10-01T10:00:00Z", dayName: "A/B:C*D?[x]", exercises: [{ name: "<b>&Press</b>", sets: [{ kg: 1, reps: 1 }] }] },
     { id: "2", date: "2026-10-01T11:00:00Z", dayName: "A/B:C*D?[x]", exercises: [{ name: "Otro", sets: [{ kg: 1, reps: 1 }] }] },
   ];
-  const { bytes, plan } = await w.buildClientExcel("ana", datos, 0, async () => PNG_FALSO);
+  const { bytes, plan } = await w.buildClientExcel("ana", datos, "2026-10-01", async () => PNG_FALSO);
   const nombres = plan.daySheets.map(s => s.sheetName);
   assert.equal(new Set(nombres.map(n => n.toLowerCase())).size, nombres.length);
   assert.ok(nombres.every(n => n.length <= 31 && !/[\[\]:*?\/\\]/.test(n)));
@@ -296,12 +316,13 @@ test("excel por email: solo el admin, valida el email y adjunta el .xlsx", async
   await crearUsuario(env, "ana");
   const t = (await entrar(env, "ana")).data.token;
   await llamar(w, env, "/data", { metodo: "PUT", token: t, cuerpo: { plans: [], profile: datosExcel().profile, state: datosExcel().state, _rev: 0 } });
-  const cuerpo = { username: "ana", to: "admin@correo.test", rangeDays: 30 };
+  const cuerpo = { username: "ana", to: "admin@correo.test", startDate: ymdHace(25) };
 
   assert.equal((await llamar(w, env, "/admin/send-client-excel", { metodo: "POST", cuerpo })).status, 401);
   assert.equal((await llamar(w, env, "/admin/send-client-excel", { metodo: "POST", token: t, cuerpo })).status, 401); // un cliente no puede
   assert.equal((await llamar(w, env, "/admin/send-client-excel", { metodo: "POST", admin: ADMIN, cuerpo: { ...cuerpo, to: "no-es-email" } })).status, 400);
-  assert.equal((await llamar(w, env, "/admin/send-client-excel", { metodo: "POST", admin: ADMIN, cuerpo: { ...cuerpo, rangeDays: 7 } })).status, 400);
+  assert.equal((await llamar(w, env, "/admin/send-client-excel", { metodo: "POST", admin: ADMIN, cuerpo: { ...cuerpo, startDate: "31-02-2026" } })).status, 400);
+  assert.equal((await llamar(w, env, "/admin/send-client-excel", { metodo: "POST", admin: ADMIN, cuerpo: { username: "ana", to: "admin@correo.test" } })).status, 400); // falta el día base
   assert.equal((await llamar(w, env, "/admin/send-client-excel", { metodo: "POST", admin: ADMIN, cuerpo: { ...cuerpo, username: "nadie" } })).status, 404);
 
   const original = globalThis.fetch;
@@ -357,7 +378,7 @@ test("base64 propio: igual que el estándar para cualquier longitud", () => {
 test("excel: cada ejercicio tiene su propio color (naranjas y grises alternados) y el estilo existe", async () => {
   const ej = (n) => ({ name: n, sets: [{ kg: 10, reps: 5 }, { kg: 12, reps: 4 }] });
   const datos = { profile: {}, state: { sessions: [{ id: "1", date: "2026-10-01T10:00:00Z", dayName: "Día", exercises: [ej("A"), ej("B"), ej("C")] }] } };
-  const { bytes } = await w.buildClientExcel("ana", datos, 0, async () => PNG_FALSO);
+  const { bytes } = await w.buildClientExcel("ana", datos, "2026-10-01", async () => PNG_FALSO);
   const f = leerZip(bytes);
   const hoja = Buffer.from(f["xl/worksheets/sheet2.xml"]).toString("utf8");
   const estilo = (ref) => Number((hoja.match(new RegExp(`<c r="${ref}" s="(\\d+)"`)) || [])[1]);
