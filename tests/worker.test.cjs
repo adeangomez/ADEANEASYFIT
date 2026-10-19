@@ -405,3 +405,10 @@ test("excel: un ejercicio sin ninguna marca y las series vacías no aparecen (ni
   assert.equal(todo.includes("EJERCICIO-VACIO"), false);
   assert.equal(p2.daySheets[0].images[0].url.includes("EJERCICIO-VACIO"), false); // tampoco en el gráfico
 });
+
+test("excel: las hojas de cada día no llevan fila de totales", async () => {
+  const { bytes } = await w.buildClientExcel("ana", datosExcel(), ymdHace(25), async () => PNG_FALSO);
+  const hoja = Buffer.from(leerZip(bytes)["xl/worksheets/sheet2.xml"]).toString("utf8");
+  assert.equal(hoja.includes("Totales"), false);
+  assert.equal(hoja.includes("<f>"), false); // ni fórmulas de suma
+});

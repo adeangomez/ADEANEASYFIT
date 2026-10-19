@@ -2114,15 +2114,7 @@ function renderClientXlsx(plan, imageBytes) {
       rows.push({ n: row, cells });
       row++;
     });
-    const first = 6, last = row - 1;
-    const totalKg = Math.round(sh.setRows.reduce((s, x) => s + x.kg, 0) * 10) / 10;
-    const totalReps = sh.setRows.reduce((s, x) => s + x.reps, 0);
-    rows.push({ n: row, cells: [
-      textCell("A" + row, "Totales", 1), numCell("B" + row, sh.setRows.length, 5),
-      `<c r="C${row}" s="5"><f>SUM(C${first}:C${last})</f><v>${totalReps}</v></c>`,
-      `<c r="D${row}" s="5"><f>SUM(D${first}:D${last})</f><v>${totalKg}</v></c>`,
-    ] });
-    let cursor = row + 2;
+    let cursor = row + 1; // una fila de separación tras la última serie
 
     // Gráficos de esa hoja que se pudieron descargar
     const anchors = [];
