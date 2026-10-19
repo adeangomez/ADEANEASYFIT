@@ -1180,7 +1180,7 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
         const html = emailShell(
           `Marcas de <b>${escapeHtmlEmail(username)}</b> en Excel`,
           `<p style="margin:0 0 8px;font-size:14px;">Adjunto el Excel con las marcas registradas (${rangoTxt}).</p>
-           <p style="margin:0;font-size:13px;color:#bbb;">${plan.daySheets.length} día${plan.daySheets.length === 1 ? "" : "s"} de entrenamiento, una hoja por día con ejercicios, series, repeticiones, pesos y ${charts} gráfico${charts === 1 ? "" : "s"}. La primera hoja es un resumen.</p>`,
+           <p style="margin:0;font-size:13px;color:#bbb;">${plan.daySheets.length} día${plan.daySheets.length === 1 ? "" : "s"} de entrenamiento, una hoja por día con ejercicios, series, repeticiones, pesos y el gráfico general de la sesión. La primera hoja es un resumen.</p>`,
           "Enviado desde el panel de administración de ADEANEASYFIT.");
         const stamp = new Date().toISOString().slice(0, 10);
         await sendEmailViaResend(env, to, `Excel de marcas — ${username}`, html, [{
@@ -1825,7 +1825,7 @@ function expectedGapHtml(lastKg, expected, who) {
 // de ejercicios/series/reps/kg y los gráficos de ese día.
 // =====================================================================
 const EXCEL_MAX_SESSIONS = 60;  // hojas máximas (las más recientes)
-const EXCEL_MAX_IMAGES = 24;    // gráficos máximos (límite de peticiones externas y de CPU)
+const EXCEL_MAX_IMAGES = 40;    // gráficos máximos (límite de peticiones externas y de CPU)
 const EXCEL_RANGES = [0, 30, 90, 180, 365]; // días hacia atrás; 0 = todo
 
 let CRC_TABLE = null;
@@ -1975,36 +1975,14 @@ function planClientExcel(username, data, rangeDays) {
     daySheets.push({ sheetName, session, fecha, setRows, images: [] });
   });
 
-  // Gráficos: primero el de cada día; con el cupo que quede, la evolución de cada ejercicio.
+  // Gráfico: solo el general de cada sesión (carga real frente a la sombra esperada, por serie).
   let budget = EXCEL_MAX_IMAGES;
   daySheets.forEach(sh => {
     if (budget <= 0) return;
     const { config, width } = dayBarChartConfig(sh.setRows);
-    sh.images.push({ label: "Carga real frente a la sombra esperada, por serie", url: quickChartUrl(config, width, 280, 1), w: width, h: 280 });
+    sh.images.push({ label: "Gráfico general de la sesión: carga real frente a la sombra esperada, por serie", url: quickChartUrl(config, width, 280, 1), w: width, h: 280 });
     budget--;
   });
-  daySheets.forEach(sh => {
-    const names = [];
-    sh.setRows.forEach(r => { if (!names.includes(r.exerciseName)) names.push(r.exerciseName); });
-    names.forEach(name => {
-      if (budget <= 0) return;
-      const points = [];
-      allSessions.forEach(s => {
-        if (new Date(s.date) > new Date(sh.session.date)) return; // evolución hasta ese día
-        const ex = (s.exercises || []).find(e => e.name === name);
-        if (!ex) return;
-        const mx = (ex.sets || []).reduce((m, st) => Math.max(m, st.kg || 0), 0);
-        if (mx > 0) points.push({ date: s.date, kg: mx });
-      });
-      points.sort((a, b) => new Date(a.date) - new Date(b.date));
-      const last = points.slice(-20);
-      if (last.length < 2) return;
-      const expected = computeExpectedMaxEmail(profile, name);
-      sh.images.push({ label: `Evolución de «${name}» (peso máximo por sesión)`, url: quickChartUrl(exerciseLineChartConfig(name, last, expected), 600, 260, 1), w: 600, h: 260 });
-      budget--;
-    });
-  });
-
   return { username, rangeDays, truncated, totalSessionsInRange: sessions.length, daySheets };
 }
 

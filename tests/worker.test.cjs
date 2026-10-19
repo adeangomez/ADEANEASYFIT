@@ -250,7 +250,7 @@ test("excel: respeta el periodo, salta sesiones en blanco y pide gráficos", () 
   assert.equal(plan.daySheets.length, 2); // fuera: la de hace 400 días y la sesión vacía
   assert.equal(plan.daySheets[0].session.durationSec, 3725); // la más reciente primero
   assert.ok(plan.daySheets.every(sh => sh.setRows.every(r => r.kg > 0 || r.reps > 0)));
-  assert.ok(plan.daySheets.every(sh => sh.images.length >= 1 && sh.images[0].url.startsWith("https://quickchart.io/")));
+  assert.ok(plan.daySheets.every(sh => sh.images.length === 1 && sh.images[0].url.startsWith("https://quickchart.io/"))); // solo el gráfico general de la sesión
   assert.equal(w.planClientExcel("ana", datosExcel(), 0).daySheets.length, 3);
 });
 
@@ -264,7 +264,7 @@ test("excel: se genera un .xlsx con resumen, una hoja por día, datos y gráfico
   const hoja = Buffer.from(f["xl/worksheets/sheet2.xml"]).toString("utf8");
   assert.ok(hoja.includes("Press banca") && hoja.includes("Repeticiones") && hoja.includes("Peso (kg)"));
   assert.ok(hoja.includes("1 h 02 min")); // duración del entrenamiento
-  assert.ok(charts >= 2);
+  assert.equal(charts, plan.daySheets.length); // un gráfico por hoja
   assert.ok(Object.keys(f).some(n => n.startsWith("xl/media/")));
   assert.ok(f["xl/drawings/drawing1.xml"] && f["xl/worksheets/_rels/sheet2.xml.rels"]);
 });
