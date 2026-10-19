@@ -77,7 +77,7 @@ Desde `admin.html`, con tu clave de administrador:
 - Crear usuarios nuevos (usuario + contraseña)
 - **Suspender** una cuenta (le corta el acceso sin borrar sus datos) y **reactivarla** cuando quieras, o **eliminarla** del todo
 - **Progreso de usuarios**: elige cualquier cuenta y consulta su historial completo y una gráfica de su evolución total, sin necesidad de que esa persona te enseñe su móvil
-- **Enviar Excel**: en cada usuario de la lista, el botón "Enviar Excel" manda a tu correo un `.xlsx` con las marcas de ese cliente (30/90 días, 6 meses, 1 año o todo). Primera hoja de resumen y una hoja por día entrenado, con ejercicios, series, repeticiones, pesos, duración y el gráfico general de esa sesión
+- **Enviar Excel**: en cada usuario de la lista, el botón "Enviar Excel" manda a tu correo un `.xlsx` con las marcas de ese cliente (30/90 días, 6 meses, 1 año o todo). Primera hoja de resumen y una hoja por día entrenado, con ejercicios, series, repeticiones, pesos, duración y el gráfico general de esa sesión. Cada ejercicio va en una banda de color (naranjas y grises alternados) para distinguirlos de un vistazo
 
 </details>
 

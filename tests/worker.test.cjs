@@ -353,3 +353,18 @@ test("base64 propio: igual que el estándar para cualquier longitud", () => {
     assert.equal(w.bytesToBase64(b), Buffer.from(b).toString("base64"), "longitud " + n);
   }
 });
+
+test("excel: cada ejercicio tiene su propio color (naranjas y grises alternados) y el estilo existe", async () => {
+  const ej = (n) => ({ name: n, sets: [{ kg: 10, reps: 5 }, { kg: 12, reps: 4 }] });
+  const datos = { profile: {}, state: { sessions: [{ id: "1", date: "2026-10-01T10:00:00Z", dayName: "Día", exercises: [ej("A"), ej("B"), ej("C")] }] } };
+  const { bytes } = await w.buildClientExcel("ana", datos, 0, async () => PNG_FALSO);
+  const f = leerZip(bytes);
+  const hoja = Buffer.from(f["xl/worksheets/sheet2.xml"]).toString("utf8");
+  const estilo = (ref) => Number((hoja.match(new RegExp(`<c r="${ref}" s="(\\d+)"`)) || [])[1]);
+  const [a, b, c] = [estilo("A6"), estilo("A8"), estilo("A10")]; // 2 series por ejercicio
+  assert.ok(a && b && c && new Set([a, b, c]).size === 3, "cada ejercicio debe tener un estilo distinto");
+  assert.equal(estilo("A7"), a); // todas las series del mismo ejercicio comparten color
+  const estilos = Buffer.from(f["xl/styles.xml"]).toString("utf8");
+  const total = Number(estilos.match(/<cellXfs count="(\d+)"/)[1]);
+  assert.ok(Math.max(a, b, c) < total && (estilos.match(/<xf /g) || []).length === total + 1); // +1 por cellStyleXfs
+});

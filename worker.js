@@ -1529,6 +1529,13 @@ function orangeShadeForIndex(idx) {
   const lightness = 46 + (idx % 6) * 7; // 46%-81%, recorre varios tonos de naranja
   return `hsl(22, 92%, ${lightness}%)`;
 }
+function exerciseColorMapFromPalette(setRows, palette) {
+  const names = [];
+  setRows.forEach(r => { if (!names.includes(r.exerciseName)) names.push(r.exerciseName); });
+  const map = {};
+  names.forEach((n, i) => { map[n] = palette[i % palette.length]; });
+  return map;
+}
 function dayExerciseColorMap(setRows) {
   const names = [];
   setRows.forEach(r => { if (!names.includes(r.exerciseName)) names.push(r.exerciseName); });
@@ -1542,11 +1549,12 @@ function dayExerciseColorMap(setRows) {
 // serie. El ancho de la imagen crece con el número de series para que
 // ninguna barra quede aplastada o invisible cuando hay muchos
 // ejercicios/series en la sesión.
-function dayBarChartConfig(setRows) {
+function dayBarChartConfig(setRows, palette) {
   const hasExpected = setRows.some(r => r.expected != null);
   const labels = setRows.map(r => `${r.shortName} S${r.setNum}`);
   const width = Math.min(1400, Math.max(600, setRows.length * 55));
-  const colorMap = dayExerciseColorMap(setRows);
+  // Por defecto, tonos de naranja (email). El Excel pasa su propia paleta naranja/gris.
+  const colorMap = palette ? exerciseColorMapFromPalette(setRows, palette) : dayExerciseColorMap(setRows);
   const realColors = setRows.map(r => colorMap[r.exerciseName]);
   const datasets = [];
   if (hasExpected) datasets.push({ label: "Sombra esperada", data: setRows.map(r => r.expected), backgroundColor: "rgba(255,122,61,0.30)" });
@@ -1979,7 +1987,7 @@ function planClientExcel(username, data, rangeDays) {
   let budget = EXCEL_MAX_IMAGES;
   daySheets.forEach(sh => {
     if (budget <= 0) return;
-    const { config, width } = dayBarChartConfig(sh.setRows);
+    const { config, width } = dayBarChartConfig(sh.setRows, EXCEL_PALETTE.map(c => "#" + c));
     sh.images.push({ label: "Gráfico general de la sesión: carga real frente a la sombra esperada, por serie", url: quickChartUrl(config, width, 280, 1), w: width, h: 280 });
     budget--;
   });
@@ -1999,9 +2007,31 @@ function sheetXml(rows, colWidths, hasDrawing) {
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${cols}</cols><sheetData>${body}</sheetData>${hasDrawing ? '<drawing r:id="rId1"/>' : ""}</worksheet>`;
 }
 
-const XLSX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="4"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FFFF5A2E"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFF7A3D"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+// Colores por ejercicio en el Excel: alternan naranjas y grises (de claro a más intenso)
+// para distinguir de un vistazo dónde acaba un ejercicio y empieza otro.
+const EXCEL_PALETTE = ["FFD2B0", "E6E6E6", "FFB27F", "C4C4C4", "FF9A5C", "A6A6A6"];
+
+function buildXlsxStyles() {
+  const fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>',
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFFF7A3D"/><bgColor indexed="64"/></patternFill></fill>']
+    .concat(EXCEL_PALETTE.map(c => `<fill><patternFill patternType="solid"><fgColor rgb="FF${c}"/><bgColor indexed="64"/></patternFill></fill>`));
+  const xfs = [
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>',
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>',
+    '<xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center"/></xf>',
+    '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>',
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center"/></xf>',
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center"/></xf>',
+  ];
+  EXCEL_PALETTE.forEach((c, i) => {
+    xfs.push(`<xf numFmtId="0" fontId="0" fillId="${3 + i}" borderId="0" xfId="0" applyFill="1"/>`); // izquierda
+    xfs.push(`<xf numFmtId="0" fontId="0" fillId="${3 + i}" borderId="0" xfId="0" applyFill="1" applyAlignment="1"><alignment horizontal="center"/></xf>`); // centrado
+  });
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="4"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FFFF5A2E"/><name val="Calibri"/></font></fonts><fills count="${fills.length}">${fills.join("")}</fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${xfs.length}">${xfs.join("")}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+}
 // Índices de estilo: 1 negrita · 2 cabecera naranja · 3 título · 4 centrado · 5 negrita centrado
+// · 6+2c fondo de color c alineado a la izquierda · 7+2c fondo de color c centrado
 
 // Monta el .xlsx. images: array paralelo a plan.daySheets[i].images con { bytes } o null si falló.
 function renderClientXlsx(plan, imageBytes) {
@@ -2045,11 +2075,17 @@ function renderClientXlsx(plan, imageBytes) {
     const header = ["Ejercicio", "Serie", "Repeticiones", "Peso (kg)", "Sombra esperada (kg)", "Diferencia (kg)"];
     rows.push({ n: 5, cells: header.map((h, i) => textCell(colLetter(i) + "5", h, 2)) });
     let row = 6;
+    const exOrder = [];
     sh.setRows.forEach(x => {
-      const cells = [textCell("A" + row, x.exerciseName), numCell("B" + row, x.setNum, 4), numCell("C" + row, x.reps, 4), numCell("D" + row, x.kg, 4)];
+      let ci = exOrder.indexOf(x.exerciseName);
+      if (ci < 0) { exOrder.push(x.exerciseName); ci = exOrder.length - 1; }
+      const left = 6 + 2 * (ci % EXCEL_PALETTE.length), center = left + 1; // color propio de cada ejercicio
+      const cells = [textCell("A" + row, x.exerciseName, left), numCell("B" + row, x.setNum, center), numCell("C" + row, x.reps, center), numCell("D" + row, x.kg, center)];
       if (x.expected != null) {
-        cells.push(numCell("E" + row, x.expected, 4));
-        cells.push(numCell("F" + row, Math.round((x.kg - x.expected) * 10) / 10, 4));
+        cells.push(numCell("E" + row, x.expected, center));
+        cells.push(numCell("F" + row, Math.round((x.kg - x.expected) * 10) / 10, center));
+      } else {
+        cells.push(`<c r="E${row}" s="${center}"/>`, `<c r="F${row}" s="${center}"/>`);
       }
       rows.push({ n: row, cells });
       row++;
@@ -2101,7 +2137,7 @@ function renderClientXlsx(plan, imageBytes) {
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${NS_R}"><sheets>${sheetsXml}</sheets></workbook>` });
   files.push({ name: "xl/_rels/workbook.xml.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheetParts.map((p, i) => `<Relationship Id="rId${i + 1}" Type="${NS_R}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}<Relationship Id="rId${sheetParts.length + 1}" Type="${NS_R}/styles" Target="styles.xml"/></Relationships>` });
-  files.push({ name: "xl/styles.xml", data: XLSX_STYLES });
+  files.push({ name: "xl/styles.xml", data: buildXlsxStyles() });
   sheetParts.forEach((p, i) => {
     files.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: p.xml });
     if (p.drawing) {
