@@ -389,3 +389,19 @@ test("excel: cada ejercicio tiene su propio color (naranjas y grises alternados)
   const total = Number(estilos.match(/<cellXfs count="(\d+)"/)[1]);
   assert.ok(Math.max(a, b, c) < total && (estilos.match(/<xf /g) || []).length === total + 1); // +1 por cellStyleXfs
 });
+
+test("excel: un ejercicio sin ninguna marca y las series vacías no aparecen (ni en la hoja, ni en el resumen, ni en el gráfico)", async () => {
+  const datos = { profile: {}, state: { sessions: [{ id: "1", date: "2026-10-10T10:00:00Z", dayName: "Día", exercises: [
+    { name: "Con marcas", sets: [{ kg: 20, reps: 10 }, { kg: 0, reps: 0 }, { kg: 25, reps: 8 }] },
+    { name: "EJERCICIO-VACIO", sets: [{ kg: 0, reps: 0 }, { kg: 0, reps: 0 }] },
+  ] }] } };
+  const plan = w.planClientExcel("ana", datos, "2026-10-01");
+  assert.equal(plan.daySheets.length, 1);
+  const filas = plan.daySheets[0].setRows;
+  assert.deepEqual(filas.map(r => [r.exerciseName, r.setNum]), [["Con marcas", 1], ["Con marcas", 3]]); // la serie 2 vacía no sale
+  const { bytes, plan: p2 } = await w.buildClientExcel("ana", datos, "2026-10-01", async () => PNG_FALSO);
+  const f = leerZip(bytes);
+  const todo = Object.keys(f).filter(n => n.endsWith(".xml")).map(n => Buffer.from(f[n]).toString("utf8")).join("\n");
+  assert.equal(todo.includes("EJERCICIO-VACIO"), false);
+  assert.equal(p2.daySheets[0].images[0].url.includes("EJERCICIO-VACIO"), false); // tampoco en el gráfico
+});
