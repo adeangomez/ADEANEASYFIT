@@ -3314,7 +3314,7 @@ function renderPlans(){
     </div>
     <button class="btn-primary" id="newPlanBtn" style="margin-bottom:10px;">+ Crear rutina nueva</button>
     <button class="btn-ai" id="aiPlanBtn" style="margin-bottom:10px;"><span class="ic">${ICON_SPARKLE}</span>Generar rutina con IA</button>
-    <button class="btn-secondary" id="presetPlansBtn" style="margin:0 0 16px;">Rutinas preconstruidas</button>
+    <button class="btn-ai" id="presetPlansBtn" style="margin-bottom:16px;">Rutinas preconstruidas</button>
   `;
   plans.forEach(p=>{
     const isActive = p.id === activePlanId;
