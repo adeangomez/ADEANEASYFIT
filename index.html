@@ -143,6 +143,10 @@
   .ex-thumb{ width:46px; height:46px; border-radius:8px; object-fit:contain; background:#fff; flex-shrink:0; }
   .ex-thumb-empty{ display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:16px; border:1px dashed var(--line); background:transparent; }
   .ex-picker-label{ font-size:13.5px; color:var(--text); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ex-top-row{ display:flex; align-items:center; gap:8px; margin:-2px 0 12px 4px; font-size:12px; color:var(--text-dim); }
+  .ex-top-select{ background: var(--card-2); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:6px 8px; font-size:12.5px; }
+  .set-row .lbl.top{ color: var(--iron); font-weight:800; font-size:14px; }
+  .top-tag{ font-size:9px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color: var(--iron); margin-left:8px; }
   .ex-sets-field{ width:76px; flex-shrink:0; }
   .ex-sets-field input{ width:100%; background: var(--card-2); border:1px solid var(--line); color:var(--text); border-radius:9px; padding:10px 8px; font-family:'JetBrains Mono'; font-size:14px; font-weight:600; text-align:center; }
 
@@ -478,6 +482,22 @@ const DEFAULT_DAYS_SEED = [
   ]},
 ];
 
+// RUTINAS PRECONSTRUIDAS — plantillas para copiar a "Mis rutinas" (sin kilos). Solo se guardan
+// nombre y series; reps/RIR/descanso/notas son orientación visible en la vista previa.
+const PRESET_PLANS = { "principiante": [ 
+  { "name": "Arnold split (3 días)", "days": [ { "name": "Día 1", "sub": "Pecho y Espalda", "exercises": [ { "name": "Press de pecho en máquina", "sets": 3, "reps": "10-12" }, { "name": "Press inclinado con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Aperturas de pecho en máquina", "sets": 2, "reps": "12-15" }, { "name": "Jalón al pecho", "sets": 3, "reps": "10-12" }, { "name": "Remo en máquina", "sets": 3, "reps": "10-12" }, { "name": "Remo con mancuernas", "sets": 2, "reps": "10-12" } ] }, { "name": "Día 2", "sub": "Hombro y Brazos", "exercises": [ { "name": "Press militar en máquina", "sets": 3, "reps": "10-12" }, { "name": "Aperturas de hombro", "sets": 3, "reps": "12-15" }, { "name": "Pec deck posterior invertido", "sets": 2, "reps": "12-15" }, { "name": "Curl con mancuernas alterno", "sets": 3, "reps": "10-12" }, { "name": "Curl martillo", "sets": 2, "reps": "10-12" }, { "name": "Extensión de tríceps en polea alta", "sets": 3, "reps": "10-12" }, { "name": "Extensión de tríceps trasnuca", "sets": 2, "reps": "12-15" } ] }, { "name": "Día 3", "sub": "Pierna", "exercises": [ { "name": "Prensa de piernas", "sets": 3, "reps": "10-12" }, { "name": "Hack squat", "sets": 3, "reps": "10-12" }, { "name": "Curl femoral sentado", "sets": 3, "reps": "10-12" }, { "name": "Extensión de cuádriceps", "sets": 2, "reps": "12-15" }, { "name": "Hip thrust", "sets": 3, "reps": "10-12" }, { "name": "Extensión de gemelo de pie", "sets": 3, "reps": "12-15" } ] } ] }, 
+  { "name": "Torso-Pierna (4 días)", "days": [ { "name": "Torso A", "sub": "", "exercises": [ { "name": "Press de pecho en máquina", "sets": 3, "reps": "8-12" }, { "name": "Jalón al pecho", "sets": 3, "reps": "8-12" }, { "name": "Press militar con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Remo en máquina", "sets": 3, "reps": "10-12" }, { "name": "Curl con mancuernas alterno", "sets": 2, "reps": "10-12" }, { "name": "Extensión de tríceps en polea alta", "sets": 2, "reps": "10-12" } ] }, { "name": "Pierna A", "sub": "", "exercises": [ { "name": "Prensa de piernas", "sets": 3, "reps": "10-12" }, { "name": "Curl femoral sentado", "sets": 3, "reps": "10-12" }, { "name": "Zancadas con mancuernas", "sets": 2, "reps": "10 por pierna" }, { "name": "Extensión de cuádriceps", "sets": 2, "reps": "12-15" }, { "name": "Extensión de gemelo de pie", "sets": 3, "reps": "12-15" }, { "name": "Planchas abdominales", "sets": 3, "reps": "20-30 s" } ] }, { "name": "Torso B", "sub": "", "exercises": [ { "name": "Press inclinado con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Remo con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Aperturas de hombro", "sets": 3, "reps": "12-15" }, { "name": "Face pull", "sets": 2, "reps": "12-15" }, { "name": "Curl martillo", "sets": 2, "reps": "10-12" }, { "name": "Extensión de tríceps trasnuca", "sets": 2, "reps": "10-12" } ] }, { "name": "Pierna B", "sub": "", "exercises": [ { "name": "Hack squat", "sets": 3, "reps": "10-12" }, { "name": "Peso muerto rumano con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Hip thrust", "sets": 3, "reps": "10-12" }, { "name": "Curl femoral tumbado", "sets": 2, "reps": "12-15" }, { "name": "Aductor externo en máquina", "sets": 2, "reps": "12-15" }, { "name": "Extensión de gemelo sentado", "sets": 3, "reps": "12-15" }, { "name": "Crunch de abdomen en polea", "sets": 3, "reps": "12-15" } ] } ] }, 
+  { "name": "Push-Pull-Leg (3 días)", "days": [ { "name": "Push", "sub": "", "exercises": [ { "name": "Press de pecho en máquina", "sets": 3, "reps": "10-12" }, { "name": "Press inclinado con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Press militar en máquina", "sets": 3, "reps": "10-12" }, { "name": "Aperturas de hombro", "sets": 3, "reps": "12-15" }, { "name": "Extensión de tríceps en polea alta", "sets": 3, "reps": "10-12" }, { "name": "Extensión de tríceps trasnuca", "sets": 2, "reps": "12-15" } ] }, { "name": "Pull", "sub": "", "exercises": [ { "name": "Jalón al pecho", "sets": 3, "reps": "10-12" }, { "name": "Remo en máquina", "sets": 3, "reps": "10-12" }, { "name": "Remo con mancuernas", "sets": 2, "reps": "10-12" }, { "name": "Face pull", "sets": 3, "reps": "12-15" }, { "name": "Curl con mancuernas alterno", "sets": 3, "reps": "10-12" }, { "name": "Curl martillo", "sets": 2, "reps": "10-12" } ] }, { "name": "Leg", "sub": "", "exercises": [ { "name": "Prensa de piernas", "sets": 3, "reps": "10-12" }, { "name": "Hack squat", "sets": 3, "reps": "10-12" }, { "name": "Curl femoral sentado", "sets": 3, "reps": "10-12" }, { "name": "Extensión de cuádriceps", "sets": 2, "reps": "12-15" }, { "name": "Hip thrust", "sets": 3, "reps": "10-12" }, { "name": "Extensión de gemelo de pie", "sets": 3, "reps": "12-15" } ] } ] }, 
+  { "name": "Básica 3 días", "days": [ { "name": "Día 1", "sub": "Pecho Tríceps Hombro", "exercises": [ { "name": "Press de pecho en máquina", "sets": 3, "reps": "10-12" }, { "name": "Press inclinado con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Aperturas de pecho en máquina", "sets": 2, "reps": "12-15" }, { "name": "Press militar en máquina", "sets": 3, "reps": "10-12" }, { "name": "Aperturas de hombro", "sets": 3, "reps": "12-15" }, { "name": "Extensión de tríceps en polea alta", "sets": 3, "reps": "10-12" }, { "name": "Extensión de tríceps trasnuca", "sets": 2, "reps": "12-15" } ] }, { "name": "Día 2", "sub": "Espalda y Bíceps", "exercises": [ { "name": "Jalón al pecho", "sets": 3, "reps": "10-12" }, { "name": "Remo en máquina", "sets": 3, "reps": "10-12" }, { "name": "Remo con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Face pull", "sets": 2, "reps": "12-15" }, { "name": "Curl con mancuernas alterno", "sets": 3, "reps": "10-12" }, { "name": "Curl martillo", "sets": 2, "reps": "10-12" } ] }, { "name": "Día 3", "sub": "Pierna y Abdomen", "exercises": [ { "name": "Prensa de piernas", "sets": 3, "reps": "10-12" }, { "name": "Hack squat", "sets": 3, "reps": "10-12" }, { "name": "Curl femoral sentado", "sets": 3, "reps": "10-12" }, { "name": "Extensión de cuádriceps", "sets": 2, "reps": "12-15" }, { "name": "Hip thrust", "sets": 3, "reps": "10-12" }, { "name": "Extensión de gemelo de pie", "sets": 3, "reps": "12-15" }, { "name": "Planchas abdominales", "sets": 3, "reps": "20-30 s" }, { "name": "Crunch de abdomen en polea", "sets": 3, "reps": "12-15" }, { "name": "Rodillas al pecho", "sets": 2, "reps": "10-12" } ] } ] }, 
+  { "name": "Mujer: glúteo, pierna y abdomen con torso general (3 días)", "days": [ { "name": "Día 1", "sub": "Glúteo y Pierna", "exercises": [ { "name": "Hip thrust", "sets": 3, "reps": "10-12" }, { "name": "Prensa de piernas", "sets": 3, "reps": "10-12" }, { "name": "Hack squat", "sets": 3, "reps": "10-12" }, { "name": "Extensión de cuádriceps", "sets": 2, "reps": "12-15" }, { "name": "Aductor externo en máquina", "sets": 3, "reps": "12-15" }, { "name": "Planchas abdominales", "sets": 3, "reps": "20-30 s" }, { "name": "Crunch de abdomen en polea", "sets": 3, "reps": "12-15" } ] }, { "name": "Día 2", "sub": "Torso General", "exercises": [ { "name": "Press de pecho en máquina", "sets": 3, "reps": "10-12" }, { "name": "Jalón al pecho", "sets": 3, "reps": "10-12" }, { "name": "Remo en máquina", "sets": 3, "reps": "10-12" }, { "name": "Press militar con mancuernas", "sets": 2, "reps": "10-12" }, { "name": "Aperturas de hombro", "sets": 2, "reps": "12-15" }, { "name": "Curl con mancuernas alterno", "sets": 2, "reps": "12-15" }, { "name": "Extensión de tríceps en polea alta", "sets": 2, "reps": "12-15" }, { "name": "Rodillas al pecho", "sets": 2, "reps": "10-12" } ] }, { "name": "Día 3", "sub": "Glúteo e Isquios", "exercises": [ { "name": "Peso muerto rumano con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Zancadas con mancuernas", "sets": 3, "reps": "10 por pierna" }, { "name": "Curl femoral tumbado", "sets": 3, "reps": "10-12" }, { "name": "Patada de glúteo en polea", "sets": 3, "reps": "12-15 por pierna" }, { "name": "Extensión de gemelo de pie", "sets": 3, "reps": "12-15" }, { "name": "Rodillas al pecho", "sets": 3, "reps": "10-12" }, { "name": "Crunch de abdomen en máquina", "sets": 3, "reps": "12-15" } ] } ] }, 
+  { "name": "Full body hombre (3 días)", "days": [ { "name": "Día 1", "sub": "Full Body A", "exercises": [ { "name": "Prensa de piernas", "sets": 3, "reps": "10-12" }, { "name": "Press de pecho en máquina", "sets": 3, "reps": "10-12" }, { "name": "Jalón al pecho", "sets": 3, "reps": "10-12" }, { "name": "Peso muerto rumano con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Aperturas de hombro", "sets": 2, "reps": "12-15" }, { "name": "Extensión de tríceps en polea alta", "sets": 2, "reps": "12-15" }, { "name": "Planchas abdominales", "sets": 3, "reps": "20-30 s" } ] }, { "name": "Día 2", "sub": "Full Body B", "exercises": [ { "name": "Hack squat", "sets": 3, "reps": "10-12" }, { "name": "Press inclinado con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Remo en máquina", "sets": 3, "reps": "10-12" }, { "name": "Curl femoral sentado", "sets": 3, "reps": "10-12" }, { "name": "Press militar en máquina", "sets": 2, "reps": "10-12" }, { "name": "Curl con mancuernas alterno", "sets": 2, "reps": "12-15" }, { "name": "Crunch de abdomen en polea", "sets": 3, "reps": "12-15" } ] }, { "name": "Día 3", "sub": "Full Body C", "exercises": [ { "name": "Zancadas con mancuernas", "sets": 3, "reps": "10 por pierna" }, { "name": "Press plano con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Remo con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Hip thrust", "sets": 3, "reps": "10-12" }, { "name": "Press militar con mancuernas", "sets": 2, "reps": "10-12" }, { "name": "Face pull", "sets": 2, "reps": "12-15" }, { "name": "Rodillas al pecho", "sets": 3, "reps": "10-12" } ] } ] }, 
+  { "name": "Full body mujer (3 días)", "days": [ { "name": "Día 1", "sub": "Full Body A", "exercises": [ { "name": "Hip thrust", "sets": 3, "reps": "10-12" }, { "name": "Prensa de piernas", "sets": 3, "reps": "10-12" }, { "name": "Press de pecho en máquina", "sets": 3, "reps": "10-12" }, { "name": "Jalón al pecho", "sets": 3, "reps": "10-12" }, { "name": "Aperturas de hombro", "sets": 2, "reps": "12-15" }, { "name": "Aductor externo en máquina", "sets": 2, "reps": "12-15" }, { "name": "Crunch de abdomen en polea", "sets": 3, "reps": "12-15" } ] }, { "name": "Día 2", "sub": "Full Body B", "exercises": [ { "name": "Peso muerto rumano con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Hack squat", "sets": 3, "reps": "10-12" }, { "name": "Remo en máquina", "sets": 3, "reps": "10-12" }, { "name": "Press militar con mancuernas", "sets": 2, "reps": "10-12" }, { "name": "Patada de glúteo en polea", "sets": 3, "reps": "12-15 por pierna" }, { "name": "Planchas abdominales", "sets": 3, "reps": "20-30 s" }, { "name": "Rodillas al pecho", "sets": 2, "reps": "10-12" } ] }, { "name": "Día 3", "sub": "Full Body C", "exercises": [ { "name": "Zancadas con mancuernas", "sets": 3, "reps": "10 por pierna" }, { "name": "Curl femoral sentado", "sets": 3, "reps": "10-12" }, { "name": "Press inclinado en máquina", "sets": 3, "reps": "10-12" }, { "name": "Remo con mancuernas", "sets": 3, "reps": "10-12" }, { "name": "Extensión de gemelo de pie", "sets": 3, "reps": "12-15" }, { "name": "Curl con mancuernas alterno", "sets": 2, "reps": "12-15" }, { "name": "Extensión de tríceps en polea alta", "sets": 2, "reps": "12-15" }, { "name": "Planchas abdominales", "sets": 3, "reps": "20-30 s" } ] } ] } ], "intermedio": [ 
+  { "name": "Torso-Pierna (4 días)", "days": [ { "name": "Día 1", "sub": "Torso A", "exercises": [ { "name": "Press banca", "sets": 4, "reps": "5-6 · top set / 6-8 · back-off / 6-8 · back-off / 8-10 · back-off", "rir": "1-2", "rest": "2-3 min", "note": "3 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Remo con barra", "sets": 3, "reps": "6-8 · top set / 8-10 · back-off / 8-10 · back-off", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Press militar con mancuernas", "sets": 3, "reps": "8-10 / 8-10 / 10-12 · back-off", "rir": "1-2", "rest": "90 s - 2 min" }, { "name": "Jalón al pecho", "sets": 3, "reps": "8-10 / 10-12 / 10-12 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Curl con barra Z", "sets": 3, "reps": "8-10 / 10-12 / 10-12", "rir": "1", "rest": "90 s" }, { "name": "Extensión de tríceps en polea alta", "sets": 3, "reps": "10-12 / 10-12 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." } ] }, { "name": "Día 2", "sub": "Pierna A (cuádriceps)", "exercises": [ { "name": "Sentadilla con barra", "sets": 4, "reps": "5-6 · top set / 6-8 · back-off / 6-8 · back-off / 8-10 · back-off", "rir": "2 en la top set, 1-2 en el resto", "rest": "3 min", "note": "3 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Prensa de piernas", "sets": 3, "reps": "8-10 / 10-12 / 12-15", "rir": "1", "rest": "2 min" }, { "name": "Curl femoral tumbado", "sets": 3, "reps": "8-10 / 10-12 / 10-12 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Extensión de cuádriceps", "sets": 3, "reps": "12-15 / 12-15 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Extensión de gemelo de pie", "sets": 4, "reps": "8-10 / 10-12 / 10-12 / 12-15", "rir": "0-1", "rest": "60-90 s", "note": "Pausa de 1-2 s abajo en el estiramiento." }, { "name": "Crunch de abdomen en polea", "sets": 3, "reps": "10-12 / 12-15 / 12-15", "rir": "1", "rest": "60 s" } ] }, { "name": "Día 3", "sub": "Torso B", "exercises": [ { "name": "Press inclinado con mancuernas", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Remo con mancuernas", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off", "rir": "1-2", "rest": "90 s - 2 min", "note": "Reps por brazo. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Aperturas de pecho en poleas", "sets": 3, "reps": "12-15 / 12-15 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Aperturas de hombro", "sets": 3, "reps": "12-15 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "60 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Pec deck posterior invertido", "sets": 3, "reps": "12-15 / 12-15 / 15-20", "rir": "1", "rest": "60 s" }, { "name": "Curl martillo", "sets": 2, "reps": "10-12 / 10-12", "rir": "1", "rest": "60-90 s" }, { "name": "Extensión de tríceps trasnuca", "sets": 2, "reps": "10-12 / 12-15", "rir": "1", "rest": "60-90 s" } ] }, { "name": "Día 4", "sub": "Pierna B (isquios)", "exercises": [ { "name": "Peso muerto rumano con barra", "sets": 3, "reps": "6-8 · top set / 8-10 · back-off / 8-10 · back-off", "rir": "2 en la top set, 1-2 en el resto", "rest": "2-3 min", "note": "2 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Hip thrust", "sets": 4, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off / 12-15 · back-off", "rir": "1-2", "rest": "2 min", "note": "Pausa de 1 s arriba. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Zancadas búlgaras", "sets": 3, "reps": "8-10 / 8-10 / 10-12", "rir": "1-2", "rest": "90 s", "note": "Reps por pierna." }, { "name": "Curl femoral sentado", "sets": 3, "reps": "10-12 / 12-15 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Extensión de gemelo sentado", "sets": 3, "reps": "12-15 / 12-15 / 15-20", "rir": "0-1", "rest": "60 s" }, { "name": "Planchas abdominales", "sets": 3, "reps": "40-60 s / 40-60 s / 40-60 s", "rir": "1-2", "rest": "60 s" } ] } ] }, 
+  { "name": "Push-Pull-Legs (6 días)", "days": [ { "name": "Día 1", "sub": "Push A", "exercises": [ { "name": "Press banca", "sets": 4, "reps": "5-6 · top set / 6-8 · back-off / 6-8 · back-off / 8-10 · back-off", "rir": "1-2", "rest": "2-3 min", "note": "3 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Press militar con mancuernas", "sets": 3, "reps": "8-10 · top set / 8-10 · back-off / 10-12 · back-off", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Press inclinado en máquina", "sets": 3, "reps": "8-10 / 10-12 / 10-12 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Aperturas de hombro", "sets": 4, "reps": "12-15 / 12-15 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "60 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Extensión de tríceps en polea alta", "sets": 3, "reps": "10-12 / 10-12 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." } ] }, { "name": "Día 2", "sub": "Pull A", "exercises": [ { "name": "Remo con barra", "sets": 4, "reps": "6-8 · top set / 8-10 · back-off / 8-10 · back-off / 8-10 · back-off", "rir": "1-2", "rest": "2-3 min", "note": "3 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Dominadas", "sets": 3, "reps": "6-8 / 6-8 / 8-10", "rir": "1-2", "rest": "2 min", "note": "Si el cliente no llega a 6 reps limpias, sustituir por Jalón al pecho." }, { "name": "Remo en máquina", "sets": 3, "reps": "10-12 / 10-12 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Face pull", "sets": 3, "reps": "12-15 / 15-20 / 15-20", "rir": "1-2", "rest": "60 s" }, { "name": "Curl con barra Z", "sets": 3, "reps": "8-10 / 10-12 / 10-12", "rir": "1", "rest": "90 s" }, { "name": "Curl martillo", "sets": 2, "reps": "10-12 / 10-12 + drop", "rir": "1 (0-1 en el drop)", "rest": "60 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." } ] }, { "name": "Día 3", "sub": "Legs A (cuádriceps)", "exercises": [ { "name": "Sentadilla con barra", "sets": 4, "reps": "5-6 · top set / 6-8 · back-off / 6-8 · back-off / 8-10 · back-off", "rir": "2 en la top set, 1-2 en el resto", "rest": "3 min", "note": "3 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Prensa de piernas", "sets": 3, "reps": "8-10 / 10-12 / 12-15", "rir": "1", "rest": "2 min" }, { "name": "Curl femoral tumbado", "sets": 3, "reps": "8-10 / 10-12 / 10-12 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Extensión de cuádriceps", "sets": 3, "reps": "12-15 / 12-15 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Extensión de gemelo de pie", "sets": 4, "reps": "8-10 / 10-12 / 10-12 / 12-15", "rir": "0-1", "rest": "60-90 s", "note": "Pausa de 1-2 s abajo." }, { "name": "Crunch de abdomen en polea", "sets": 3, "reps": "10-12 / 12-15 / 12-15", "rir": "1", "rest": "60 s" } ] }, { "name": "Día 4", "sub": "Push B", "exercises": [ { "name": "Press inclinado con mancuernas", "sets": 4, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off / 12-15 · back-off", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Press militar en máquina", "sets": 3, "reps": "8-10 / 10-12 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Aperturas de pecho en poleas", "sets": 3, "reps": "12-15 / 12-15 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Aperturas de hombro en poleas", "sets": 3, "reps": "12-15 / 12-15 / 15-20", "rir": "1", "rest": "60 s" }, { "name": "Extensión de tríceps trasnuca", "sets": 3, "reps": "10-12 / 12-15 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." } ] }, { "name": "Día 5", "sub": "Pull B", "exercises": [ { "name": "Jalón al pecho", "sets": 4, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off / 12-15 + drop", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set. Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop).", "topSet": 1 }, { "name": "Remo con mancuernas", "sets": 3, "reps": "8-10 / 10-12 / 10-12", "rir": "1-2", "rest": "90 s", "note": "Reps por brazo." }, { "name": "Remo en T", "sets": 3, "reps": "8-10 / 10-12 / 10-12", "rir": "1-2", "rest": "90 s - 2 min" }, { "name": "Pec deck posterior invertido", "sets": 3, "reps": "12-15 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "60 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Curl predicador en máquina", "sets": 3, "reps": "10-12 / 10-12 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Curl bayesiano en polea", "sets": 2, "reps": "12-15 / 12-15", "rir": "0-1", "rest": "60 s", "note": "Reps por brazo." } ] }, { "name": "Día 6", "sub": "Legs B (isquios)", "exercises": [ { "name": "Peso muerto rumano con barra", "sets": 4, "reps": "6-8 · top set / 8-10 · back-off / 8-10 · back-off / 8-10 · back-off", "rir": "2 en la top set, 1-2 en el resto", "rest": "2-3 min", "note": "2 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Hip thrust", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off", "rir": "1-2", "rest": "2 min", "note": "Pausa de 1 s arriba. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Zancadas búlgaras", "sets": 3, "reps": "8-10 / 8-10 / 10-12", "rir": "1-2", "rest": "90 s", "note": "Reps por pierna." }, { "name": "Curl femoral sentado", "sets": 3, "reps": "10-12 / 12-15 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Extensión de gemelo sentado", "sets": 4, "reps": "12-15 / 12-15 / 15-20 / 15-20", "rir": "0-1", "rest": "60 s" }, { "name": "Rodillas al pecho", "sets": 3, "reps": "10-12 / 12-15 / 12-15", "rir": "1", "rest": "60 s" } ] } ] }, 
+  { "name": "Mujer: glúteo, pierna y abdomen con torso (4 días)", "days": [ { "name": "Día 1", "sub": "Glúteo e Isquios", "exercises": [ { "name": "Hip thrust", "sets": 4, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off / 12-15 · back-off", "rir": "1-2", "rest": "2 min", "note": "Pausa de 1 s arriba. 2 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Peso muerto rumano con barra", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Zancadas búlgaras", "sets": 3, "reps": "8-10 / 10-12 / 10-12", "rir": "1-2", "rest": "90 s", "note": "Reps por pierna." }, { "name": "Patada de glúteo en polea", "sets": 3, "reps": "12-15 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Reps por pierna. Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Curl femoral sentado", "sets": 2, "reps": "10-12 / 12-15", "rir": "1", "rest": "90 s" }, { "name": "Crunch de abdomen en polea", "sets": 3, "reps": "12-15 / 12-15 / 12-15", "rir": "1", "rest": "60 s" } ] }, { "name": "Día 2", "sub": "Torso A", "exercises": [ { "name": "Press plano con mancuernas", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Jalón al pecho", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Press militar con mancuernas", "sets": 3, "reps": "8-10 / 10-12 / 10-12", "rir": "1-2", "rest": "90 s" }, { "name": "Remo en máquina", "sets": 3, "reps": "10-12 / 10-12 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Aperturas de hombro", "sets": 3, "reps": "12-15 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "60 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Curl con mancuernas alterno", "sets": 2, "reps": "10-12 / 12-15", "rir": "1", "rest": "60 s" }, { "name": "Extensión de tríceps en polea alta", "sets": 2, "reps": "10-12 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "60 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." } ] }, { "name": "Día 3", "sub": "Cuádriceps y Abdomen", "exercises": [ { "name": "Hack squat", "sets": 4, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off / 12-15 · back-off", "rir": "1-2", "rest": "2-3 min", "note": "2 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Prensa de piernas", "sets": 3, "reps": "10-12 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Pies altos y algo abiertos. Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Extensión de cuádriceps", "sets": 3, "reps": "12-15 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Curl femoral tumbado", "sets": 3, "reps": "10-12 / 12-15 / 12-15", "rir": "1", "rest": "90 s" }, { "name": "Extensión de gemelo de pie", "sets": 3, "reps": "12-15 / 12-15 / 15-20", "rir": "0-1", "rest": "60 s" }, { "name": "Abdominales con levantamiento de piernas en 90°", "sets": 3, "reps": "12-15 / 12-15 / 12-15", "rir": "1", "rest": "60 s" } ] }, { "name": "Día 4", "sub": "Torso B y Glúteo", "exercises": [ { "name": "Press inclinado en máquina", "sets": 3, "reps": "8-10 / 10-12 / 10-12", "rir": "1-2", "rest": "90 s - 2 min" }, { "name": "Remo con mancuernas", "sets": 3, "reps": "8-10 / 10-12 / 10-12", "rir": "1-2", "rest": "90 s", "note": "Reps por brazo." }, { "name": "Pec deck posterior invertido", "sets": 3, "reps": "12-15 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "60 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Hip thrust", "sets": 3, "reps": "10-12 · top set / 12-15 · back-off / 15-20 · back-off", "rir": "1", "rest": "90 s", "note": "Pausa de 1 s arriba, carga más ligera que el día 1. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Patada de glúteo en polea", "sets": 3, "reps": "12-15 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Reps por pierna. Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Aductor externo en máquina", "sets": 2, "reps": "15-20 / 20-25", "rir": "0-1", "rest": "60 s" }, { "name": "Crunch de abdomen en máquina", "sets": 3, "reps": "12-15 / 12-15 / 15-20", "rir": "1", "rest": "60 s" } ] } ] }, 
+  { "name": "Full body hombre (3 días)", "days": [ { "name": "Día 1", "sub": "Full Body A (pesado)", "exercises": [ { "name": "Sentadilla con barra", "sets": 3, "reps": "5-6 · top set / 6-8 · back-off / 6-8 · back-off", "rir": "2 en la top set, 1-2 en el resto", "rest": "3 min", "note": "3 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Press banca", "sets": 3, "reps": "5-6 · top set / 6-8 · back-off / 6-8 · back-off", "rir": "1-2", "rest": "2-3 min", "note": "2 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Remo con barra", "sets": 3, "reps": "6-8 · top set / 8-10 · back-off / 8-10 · back-off", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Press militar con mancuernas", "sets": 2, "reps": "8-10 / 10-12", "rir": "1-2", "rest": "90 s" }, { "name": "Curl con barra Z", "sets": 2, "reps": "8-10 / 10-12", "rir": "1", "rest": "90 s" }, { "name": "Extensión de tríceps en polea alta", "sets": 2, "reps": "10-12 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Crunch de abdomen en polea", "sets": 3, "reps": "12-15 / 12-15 / 12-15", "rir": "1", "rest": "60 s" } ] }, { "name": "Día 2", "sub": "Full Body B (medio)", "exercises": [ { "name": "Peso muerto rumano con barra", "sets": 3, "reps": "6-8 · top set / 8-10 · back-off / 8-10 · back-off", "rir": "2 en la top set, 1-2 en el resto", "rest": "2-3 min", "note": "2 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Press inclinado con mancuernas", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Jalón al pecho", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Prensa de piernas", "sets": 3, "reps": "8-10 / 10-12 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "2 min", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Aperturas de hombro", "sets": 3, "reps": "12-15 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "60 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Curl martillo", "sets": 2, "reps": "10-12 / 10-12", "rir": "1", "rest": "60-90 s" }, { "name": "Extensión de gemelo de pie", "sets": 2, "reps": "10-12 / 12-15", "rir": "0-1", "rest": "60 s", "note": "Pausa de 1-2 s abajo." } ] }, { "name": "Día 3", "sub": "Full Body C (volumen)", "exercises": [ { "name": "Hack squat", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 12-15 · back-off", "rir": "1-2", "rest": "2 min", "note": "2 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Press de pecho en máquina", "sets": 3, "reps": "8-10 / 10-12 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Remo con mancuernas", "sets": 3, "reps": "8-10 / 10-12 / 10-12", "rir": "1-2", "rest": "90 s", "note": "Reps por brazo." }, { "name": "Pec deck posterior invertido", "sets": 3, "reps": "12-15 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "60 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Extensión de tríceps trasnuca", "sets": 2, "reps": "10-12 / 12-15", "rir": "1", "rest": "60-90 s" }, { "name": "Curl femoral sentado", "sets": 3, "reps": "10-12 / 12-15 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Rodillas al pecho", "sets": 2, "reps": "10-12 / 12-15", "rir": "1", "rest": "60 s" } ] } ] }, 
+  { "name": "Full body mujer (3 días)", "days": [ { "name": "Día 1", "sub": "Full Body A (pesado)", "exercises": [ { "name": "Hip thrust", "sets": 4, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off / 12-15 · back-off", "rir": "1-2", "rest": "2 min", "note": "Pausa de 1 s arriba. 2 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Sentadilla con barra", "sets": 3, "reps": "6-8 · top set / 8-10 · back-off / 8-10 · back-off", "rir": "2 en la top set, 1-2 en el resto", "rest": "2-3 min", "note": "3 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Press plano con mancuernas", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Jalón al pecho", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off", "rir": "1-2", "rest": "2 min", "note": "Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Press militar con mancuernas", "sets": 2, "reps": "8-10 / 10-12", "rir": "1-2", "rest": "90 s" }, { "name": "Crunch de abdomen en polea", "sets": 3, "reps": "12-15 / 12-15 / 12-15", "rir": "1", "rest": "60 s" } ] }, { "name": "Día 2", "sub": "Full Body B (medio)", "exercises": [ { "name": "Peso muerto rumano con barra", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 10-12 · back-off", "rir": "1-2", "rest": "2 min", "note": "2 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Zancadas búlgaras", "sets": 3, "reps": "8-10 / 10-12 / 10-12", "rir": "1-2", "rest": "90 s", "note": "Reps por pierna." }, { "name": "Remo en máquina", "sets": 3, "reps": "10-12 / 10-12 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Press inclinado en máquina", "sets": 3, "reps": "8-10 / 10-12 / 10-12", "rir": "1-2", "rest": "90 s - 2 min" }, { "name": "Aperturas de hombro", "sets": 3, "reps": "12-15 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "60 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Abdominales con levantamiento de piernas en 90°", "sets": 3, "reps": "12-15 / 12-15 / 12-15", "rir": "1", "rest": "60 s" } ] }, { "name": "Día 3", "sub": "Full Body C (volumen)", "exercises": [ { "name": "Hack squat", "sets": 3, "reps": "8-10 · top set / 10-12 · back-off / 12-15 · back-off", "rir": "1-2", "rest": "2 min", "note": "2 series de aproximación antes. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Hip thrust", "sets": 3, "reps": "10-12 · top set / 12-15 · back-off / 15-20 · back-off", "rir": "1", "rest": "90 s", "note": "Pausa de 1 s arriba, carga más ligera que el día 1. Back-off: baja ~8-12% la carga de la top set.", "topSet": 1 }, { "name": "Patada de glúteo en polea", "sets": 3, "reps": "12-15 / 12-15 / 15-20 + drop", "rir": "1 (0-1 en el drop)", "rest": "60-90 s", "note": "Reps por pierna. Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Curl femoral sentado", "sets": 3, "reps": "10-12 / 12-15 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "90 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." }, { "name": "Remo con mancuernas", "sets": 3, "reps": "8-10 / 10-12 / 10-12", "rir": "1-2", "rest": "90 s", "note": "Reps por brazo." }, { "name": "Curl con mancuernas alterno", "sets": 2, "reps": "10-12 / 12-15", "rir": "1", "rest": "60 s" }, { "name": "Extensión de tríceps en polea alta", "sets": 2, "reps": "10-12 / 12-15 + drop", "rir": "1 (0-1 en el drop)", "rest": "60 s", "note": "Drop: al acabar la última serie baja ~20-25% la carga y sigue sin descanso hasta RIR 0-1 (un solo drop)." } ] } ] } ], "avanzado": [] };
+
 // -------------------------------------------------------------------------
 // LIBRERÍA DE EJERCICIOS — lista cerrada. Solo estos aparecen en el selector
 // y son los únicos que la IA puede usar al generar rutinas. Las imágenes
@@ -628,7 +648,7 @@ const AUTH_TOKEN_KEY = "adeanfit_auth_token";
 const AUTH_USER_KEY = "adeanfit_auth_username";
 
 let state = null;
-let plans = [];            // [{id, name, createdAt, days:[{name, sub, exercises:[{name,sets}]}]}]
+let plans = [];            // [{id, name, createdAt, days:[{name, sub, exercises:[{name,sets,topSet?}]}]}]  (topSet = nº de serie, 1..sets)
 let activePlanId = null;
 let activeTab = "train";
 let progressView = "carga";       // "carga" (progreso de peso levantado) | "peso" (peso corporal)
@@ -642,6 +662,7 @@ let progressPanelRangeDays = null;   // null = todo, o 7/30/90
 let weightChartRange = "absolute"; // "month" | "quarter" | "semester" | "year" | "absolute"
 let userProfile = null; // { weightKg, heightCm, timeTraining, updatedAt }
 let weightReminderDismissed = false;
+let topSetReminderDismissed = false;
 
 // Lleva la cuenta del "_rev" (nº de versión) de los datos que sabemos que
 // hay en el servidor. El servidor sube este número en cada guardado y lo
@@ -783,7 +804,7 @@ function daysUntilWeightUpdate(){
   if(remainingMs <= 0) return 0;
   return Math.ceil(remainingMs / (24*60*60*1000));
 }
-let plansView = "list";    // list | builder
+let plansView = "list";    // list | builder | ai | presets
 let planDraft = null;      // { name, days: [{name, exercises:[{name, sets}]}] }
 
 // =======================================================================
@@ -803,7 +824,7 @@ function getTrainExercises(day){
   sessionOverride = {
     planId: activePlanId || null,
     dayIndex: state.currentDayIndex,
-    exercises: day.exercises.map(e => ({ name: e.name, sets: e.sets }))
+    exercises: day.exercises.map(e => ({ name: e.name, sets: e.sets, topSet: e.topSet || 0 }))
   };
   return sessionOverride.exercises;
 }
@@ -1345,7 +1366,7 @@ function showAccountModal(){
     closeModal(overlay);
     await apiLogout();
     clearLocalSession();
-    currentUser = null; authToken = null; state = null; plans = []; activePlanId = null; userProfile = null; pendingConsents = null; weightReminderDismissed = false;
+    currentUser = null; authToken = null; state = null; plans = []; activePlanId = null; userProfile = null; pendingConsents = null; weightReminderDismissed = false; topSetReminderDismissed = false;
     activeTab = "train";
     renderApp();
   });
@@ -1698,7 +1719,7 @@ function wireConsentEvents(){
   document.getElementById("consentDecline").addEventListener("click", async ()=>{
     await apiLogout();
     clearLocalSession();
-    currentUser = null; authToken = null; state = null; plans = []; activePlanId = null; userProfile = null; pendingConsents = null; weightReminderDismissed = false;
+    currentUser = null; authToken = null; state = null; plans = []; activePlanId = null; userProfile = null; pendingConsents = null; weightReminderDismissed = false; topSetReminderDismissed = false;
     activeTab = "train";
     renderApp();
   });
@@ -2019,6 +2040,7 @@ function wireTodayEditControls(day){
       const exercises = getTrainExercises(day);
       const ex = exercises[Number(btn.dataset.ex)];
       ex.sets = Math.max(1, ex.sets - 1);
+      if(ex.topSet > ex.sets) ex.topSet = 0;
       saveTrainDraft(day);
       renderTrain();
     });
@@ -2026,7 +2048,7 @@ function wireTodayEditControls(day){
   const addBtn = document.getElementById("todayAddExBtn");
   if(addBtn) addBtn.addEventListener("click", ()=>{
     const exercises = getTrainExercises(day);
-    exercises.push({ name: "Press banca", sets: 3 });
+    exercises.push({ name: "Press banca", sets: 3, topSet: 0 });
     saveTrainDraft(day);
     openExercisePicker(0, exercises.length - 1, "train");
   });
@@ -2081,6 +2103,14 @@ function renderTrain(){
   const trainExercises = getTrainExercises(day);
   const main = document.getElementById("main");
   let html = "";
+  if(!topSetReminderDismissed && trainExercises.some(e => e.topSet && e.topSet <= e.sets)){
+    html += `<div class="reminder-card" id="topSetReminderCard">
+      <div class="reminder-text" style="padding-right:18px;">
+        <b>Recuerda tu top set.</b><br>La serie con el número en <b style="color:var(--iron);">naranja</b> es la top set: tu serie más pesada y exigente. Calienta antes y dale todo lo que tengas; en las demás, baja un poco la carga.
+      </div>
+      <button type="button" class="reminder-close" id="topSetReminderClose" aria-label="Cerrar recordatorio">✕</button>
+    </div>`;
+  }
   if(canUpdateWeight() && userProfile && userProfile.weightUpdatedAt && !weightReminderDismissed){
     html += `<div class="reminder-card" id="weightReminderCard">
       <div class="reminder-icon">${ICON_SCALE}</div>
@@ -2110,7 +2140,7 @@ function renderTrain(){
           ${libEx ? `<img src="${exerciseImgUrl(libEx.id)}" alt="" class="exercise-thumb" loading="lazy">` : ``}
           <div class="exercise-head-text">
             <h3>${ex.name}</h3>
-            <span class="setcount">${ex.sets} ${ex.sets===1?'serie':'series'}</span>
+            <span class="setcount">${ex.sets} ${ex.sets===1?'serie':'series'}${ex.topSet && ex.topSet<=ex.sets ? `<span class="top-tag">Top set: serie ${ex.topSet}</span>` : ``}</span>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
@@ -2127,7 +2157,7 @@ function renderTrain(){
       const phKg = prev && prev.kg ? prev.kg : 0;
       const phReps = prev && prev.reps ? prev.reps : 0;
       html += `<div class="set-row has-fill">
-        <div class="lbl">${s+1}</div>
+        <div class="lbl${ex.topSet===s+1?' top':''}" ${ex.topSet===s+1?'title="Top set" aria-label="Serie '+(s+1)+', top set"':''}>${s+1}</div>
         <div class="field"><input inputmode="decimal" placeholder="${phKg}" data-ex="${exIdx}" data-set="${s}" data-type="kg" data-name="${escapeAttr(ex.name)}"><span class="unit">KG</span></div>
         <div class="field"><input inputmode="numeric" placeholder="${phReps}" data-ex="${exIdx}" data-set="${s}" data-type="reps" data-name="${escapeAttr(ex.name)}"><span class="unit">REP</span></div>
         <button type="button" class="fill-btn" data-fill-ex="${exIdx}" data-fill-set="${s}" ${phKg||phReps ? "" : "disabled"} title="Rellenar con la última sesión" aria-label="Rellenar con la última sesión"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#ff5a2e" stroke-width="6"/><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#000" stroke-width="2.6"/></svg></button>
@@ -2160,6 +2190,11 @@ function renderTrain(){
   startWorkoutClockDisplay();
   const reminderBtn = document.getElementById("weightReminderBtn");
   if(reminderBtn) reminderBtn.addEventListener("click", ()=> showUpdateWeightModal());
+  const topSetClose = document.getElementById("topSetReminderClose");
+  if(topSetClose) topSetClose.addEventListener("click", ()=>{
+    topSetReminderDismissed = true;
+    document.getElementById("topSetReminderCard")?.remove();
+  });
   const reminderClose = document.getElementById("weightReminderClose");
   if(reminderClose) reminderClose.addEventListener("click", ()=>{
     weightReminderDismissed = true;
@@ -3236,7 +3271,7 @@ function draftFromPlan(plan){
     days: plan.days.map(d => ({
       name: d.name,
       sub: d.sub || "",
-      exercises: d.exercises.map(e => ({ name: e.name, sets: e.sets }))
+      exercises: d.exercises.map(e => ({ name: e.name, sets: e.sets, topSet: e.topSet || 0 }))
     }))
   };
 }
@@ -3251,6 +3286,10 @@ function renderPlans(){
     renderAiPlanView();
     return;
   }
+  if(plansView === "presets"){
+    renderPresetPlans();
+    return;
+  }
   let html = `
     <div class="section-title">
       <h2>Rutinas</h2>
@@ -3259,7 +3298,8 @@ function renderPlans(){
       Tus rutinas, sesiones y progreso se guardan en tu cuenta y están disponibles desde cualquier dispositivo en el que inicies sesión.
     </div>
     <button class="btn-primary" id="newPlanBtn" style="margin-bottom:10px;">+ Crear rutina nueva</button>
-    <button class="btn-ai" id="aiPlanBtn" style="margin-bottom:16px;"><span class="ic">${ICON_SPARKLE}</span>Generar rutina con IA</button>
+    <button class="btn-ai" id="aiPlanBtn" style="margin-bottom:10px;"><span class="ic">${ICON_SPARKLE}</span>Generar rutina con IA</button>
+    <button class="btn-secondary" id="presetPlansBtn" style="margin:0 0 16px;">Rutinas preconstruidas</button>
   `;
   plans.forEach(p=>{
     const isActive = p.id === activePlanId;
@@ -3289,6 +3329,11 @@ function renderPlans(){
   });
   document.getElementById("aiPlanBtn").addEventListener("click", ()=>{
     plansView = "ai";
+    renderPlans();
+    window.scrollTo({top:0, behavior:"smooth"});
+  });
+  document.getElementById("presetPlansBtn").addEventListener("click", ()=>{
+    plansView = "presets";
     renderPlans();
     window.scrollTo({top:0, behavior:"smooth"});
   });
@@ -3326,6 +3371,91 @@ function renderPlans(){
       plans = plans.filter(p=>p.id !== id);
       await syncToServer();
       renderPlans();
+    });
+  });
+}
+
+// ---- Rutinas preconstruidas: vista, vista previa y copia a "Mis rutinas" ----
+const PRESET_LEVELS = [
+  { key: "principiante", label: "Principiante" },
+  { key: "intermedio",   label: "Intermedio" },
+  { key: "avanzado",     label: "Avanzado" },
+];
+
+function escHtml(s){
+  return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+}
+
+// Convierte una plantilla en una rutina del usuario: solo nombre y series (sin kilos).
+function planFromPreset(levelKey, preset){
+  const lvl = PRESET_LEVELS.find(l=>l.key===levelKey);
+  return {
+    id: newPlanId(),
+    name: (preset.name + " · " + lvl.label).slice(0, 60),
+    createdAt: new Date().toISOString(),
+    days: preset.days.map(d => ({
+      name: d.name,
+      sub: d.sub || "",
+      exercises: d.exercises.map(e => ({ name: e.name, sets: e.sets, topSet: e.topSet || 0 }))
+    }))
+  };
+}
+
+function renderPresetPlans(){
+  const main = document.getElementById("main");
+  let html = `
+    <div class="section-title"><h2>Rutinas preconstruidas</h2></div>
+    <div class="hint" style="text-align:left;background:var(--card-2);border-radius:10px;padding:10px 12px;margin-bottom:14px;">
+      Elige un nivel, mira la rutina y añádela a tus rutinas. Se copia sin kilos: los rellenas tú al entrenar. Después puedes editarla como cualquier otra.
+    </div>`;
+  PRESET_LEVELS.forEach(lvl=>{
+    const list = PRESET_PLANS[lvl.key] || [];
+    html += `<details class="legal-section preset-level" data-level="${lvl.key}">
+      <summary>${lvl.label} <span style="font-weight:500;color:var(--text-faint);font-size:12px;margin-left:8px;">${list.length} rutina${list.length===1?"":"s"}</span></summary>
+      <div class="legal-body">`;
+    if(list.length === 0){
+      html += `<div style="padding:6px 0 4px;color:var(--text-faint);">Próximamente.</div>`;
+    }
+    list.forEach((p, i)=>{
+      const total = p.days.reduce((s,d)=>s+d.exercises.length,0);
+      html += `<div class="exercise-card" style="padding:14px;margin-bottom:10px;">
+        <h3 style="margin:0 0 4px;font-size:15.5px;font-weight:800;color:var(--text);">${escHtml(p.name)}</h3>
+        <div style="font-size:12px;color:var(--text-faint);">${p.days.length} día${p.days.length===1?"":"s"} · ${total} ejercicios en total</div>
+        <details style="margin-top:10px;">
+          <summary style="cursor:pointer;font-size:13px;font-weight:700;color:var(--steel);">Ver detalle</summary>
+          ${p.days.map(d=>`<div style="margin-top:10px;">
+            <div style="font-weight:700;font-size:13px;color:var(--text);">${escHtml(d.name)}${d.sub?` · <span style="font-weight:500;color:var(--text-dim);">${escHtml(d.sub)}</span>`:""}</div>
+            <ul style="margin:4px 0 0;padding-left:18px;">
+              ${d.exercises.map(e=>`<li style="font-size:12.5px;color:var(--text-dim);">${escHtml(e.name)} — ${e.sets} × ${escHtml(e.reps||"")}${e.topSet?` · top set: serie ${e.topSet}`:""}${e.rir?` · RIR ${escHtml(e.rir)}`:""}${e.rest?` · desc. ${escHtml(e.rest)}`:""}${e.note?`<div style="font-size:11.5px;color:var(--text-faint);">${escHtml(e.note)}</div>`:""}</li>`).join("")}
+            </ul>
+          </div>`).join("")}
+        </details>
+        <button class="btn-primary add-preset-btn" data-level="${lvl.key}" data-idx="${i}" style="margin-top:12px;">Añadir a mis rutinas</button>
+      </div>`;
+    });
+    html += `</div></details>`;
+  });
+  html += `<button class="btn-secondary" id="presetBackBtn">Volver a mis rutinas</button>`;
+  main.innerHTML = html;
+
+  document.getElementById("presetBackBtn").addEventListener("click", ()=>{
+    plansView = "list";
+    renderPlans();
+    window.scrollTo({top:0, behavior:"smooth"});
+  });
+  main.querySelectorAll(".add-preset-btn").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const preset = (PRESET_PLANS[btn.dataset.level] || [])[parseInt(btn.dataset.idx,10)];
+      if(!preset) return;
+      const nuevo = planFromPreset(btn.dataset.level, preset);
+      if(plans.some(p=>p.name === nuevo.name) && !confirm("Ya tienes una rutina con ese nombre. ¿Añadir otra copia?")) return;
+      btn.disabled = true;
+      plans.push(nuevo);
+      await syncToServer();
+      alert("Rutina añadida a tus rutinas. Puedes activarla desde la lista.");
+      plansView = "list";
+      renderPlans();
+      window.scrollTo({top:0, behavior:"smooth"});
     });
   });
 }
@@ -3446,6 +3576,9 @@ function renderPlanBuilder(){
         </button>
         <div class="field ex-sets-field"><input inputmode="numeric" class="ex-sets-input" data-day="${dIdx}" data-ex="${eIdx}" placeholder="3" value="${ex.sets}"><span class="unit">SETS</span></div>
         <button type="button" class="btn-text remove-ex-btn" data-day="${dIdx}" data-ex="${eIdx}" style="padding:6px;color:var(--text-faint);">✕</button>
+      </div>
+      <div class="ex-top-row"><label>Top set</label>
+        <select class="ex-top-select" data-day="${dIdx}" data-ex="${eIdx}" aria-label="Serie que es la top set de este ejercicio">${topSetOptionsHtml(ex.sets, ex.topSet)}</select>
       </div>`;
     });
     html += `<button type="button" class="btn-secondary add-ex-btn" data-day="${dIdx}" style="margin-top:8px;">+ Añadir ejercicio</button>
@@ -3468,13 +3601,24 @@ function escapeAttr(s){
   return String(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
 }
 
+function topSetOptionsHtml(sets, topSet){
+  let o = `<option value="0">Ninguna</option>`;
+  for(let i=1; i<=sets; i++) o += `<option value="${i}" ${topSet===i?"selected":""}>Serie ${i}</option>`;
+  return o;
+}
+
 function syncDraftFromDom(){
   document.querySelectorAll(".day-name-input").forEach(inp=>{
     planDraft.days[inp.dataset.day].name = inp.value;
   });
   document.querySelectorAll(".ex-sets-input").forEach(inp=>{
     const v = parseInt(inp.value, 10);
-    planDraft.days[inp.dataset.day].exercises[inp.dataset.ex].sets = isNaN(v) ? 1 : Math.max(1, Math.min(12, v));
+    const exD = planDraft.days[inp.dataset.day].exercises[inp.dataset.ex];
+    exD.sets = isNaN(v) ? 1 : Math.max(1, Math.min(12, v));
+    if(exD.topSet > exD.sets) exD.topSet = 0;
+  });
+  document.querySelectorAll(".ex-top-select").forEach(sel=>{
+    planDraft.days[sel.dataset.day].exercises[sel.dataset.ex].topSet = parseInt(sel.value, 10) || 0;
   });
   const nameInput = document.getElementById("planNameInput");
   if(nameInput) planDraft.name = nameInput.value;
@@ -3496,7 +3640,7 @@ function wirePlanBuilderEvents(){
   document.querySelectorAll(".add-ex-btn").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       syncDraftFromDom();
-      planDraft.days[btn.dataset.day].exercises.push({ name:"", sets:3 });
+      planDraft.days[btn.dataset.day].exercises.push({ name:"", sets:3, topSet:0 });
       renderPlanBuilder();
     });
   });
@@ -3513,6 +3657,18 @@ function wirePlanBuilderEvents(){
     btn.addEventListener("click", ()=>{
       syncDraftFromDom();
       openExercisePicker(parseInt(btn.dataset.day,10), parseInt(btn.dataset.ex,10));
+    });
+  });
+  // Al cambiar el nº de series, las opciones de top set se ajustan en el momento
+  document.querySelectorAll(".ex-sets-input").forEach(inp=>{
+    inp.addEventListener("input", ()=>{
+      const v = parseInt(inp.value, 10);
+      if(isNaN(v)) return;
+      const n = Math.max(1, Math.min(12, v));
+      const sel = document.querySelector(`.ex-top-select[data-day="${inp.dataset.day}"][data-ex="${inp.dataset.ex}"]`);
+      if(!sel) return;
+      const cur = parseInt(sel.value, 10) || 0;
+      sel.innerHTML = topSetOptionsHtml(n, cur <= n ? cur : 0);
     });
   });
   document.getElementById("cancelPlanBtn").addEventListener("click", ()=>{
@@ -3667,6 +3823,7 @@ function selectExerciseForSlot(dayIdx, exIdx, exerciseName){
     const day = activeDays()[state.currentDayIndex];
     if(day) saveTrainDraft(day);
     sessionOverride.exercises[exIdx].name = exerciseName;
+    sessionOverride.exercises[exIdx].topSet = 0; // otro ejercicio: la top set de la rutina ya no aplica
     closeExercisePicker();
     renderTrain();
     return;
@@ -3737,7 +3894,7 @@ async function onSavePlan(){
   const daysOut = planDraft.days.map(d => ({
     name: d.name.trim(),
     sub: d.sub || "",
-    exercises: d.exercises.map(e => ({ name: e.name.trim(), sets: e.sets }))
+    exercises: d.exercises.map(e => ({ name: e.name.trim(), sets: e.sets, topSet: (e.topSet && e.topSet <= e.sets) ? e.topSet : 0 }))
   }));
 
   if(isEditing){
@@ -3928,7 +4085,7 @@ document.addEventListener("visibilitychange", ()=>{
       // token caducado o inválido: volver a pedir login
       console.warn("Sesión no válida, pidiendo login de nuevo.", e.message);
       clearLocalSession();
-      authToken = null; currentUser = null; state = null; plans = []; activePlanId = null; userProfile = null; weightReminderDismissed = false;
+      authToken = null; currentUser = null; state = null; plans = []; activePlanId = null; userProfile = null; weightReminderDismissed = false; topSetReminderDismissed = false;
     }
   }
   renderApp();
