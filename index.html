@@ -353,6 +353,8 @@
   .auth-error.show{ display:block; }
 
   /* Account pill + modal */
+  .brand-home{ cursor:pointer; }
+  .brand-home:focus-visible{ outline:2px solid var(--iron); outline-offset:3px; border-radius:8px; }
   .brand-right{ margin-left:auto; display:flex; align-items:center; }
   .account-pill{
     display:flex; align-items:center; gap:7px; background: var(--card-2);
@@ -1227,6 +1229,19 @@ function renderApp(){
     </nav>
   `;
   document.getElementById("accountPill").addEventListener("click", showAccountModal);
+  // Ordenador (ratón): pulsar el logo o el título recarga la página y vuelve a Entrenar
+  // (al cargar, la app siempre arranca en esa pestaña; el borrador del entrenamiento se conserva).
+  if(window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches){
+    const volverInicio = ()=>{ activeTab = "train"; location.reload(); };
+    document.querySelectorAll(".brand > img, .brand > h1").forEach(el=>{
+      el.classList.add("brand-home");
+      el.setAttribute("role", "link");
+      el.setAttribute("tabindex", "0");
+      el.setAttribute("title", "Recargar e ir a Entrenar");
+      el.addEventListener("click", volverInicio);
+      el.addEventListener("keydown", e=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); volverInicio(); } });
+    });
+  }
   document.querySelectorAll("nav.tabs button").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       if(btn.dataset.tab === activeTab) return;
