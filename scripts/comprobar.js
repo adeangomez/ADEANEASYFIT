@@ -1,5 +1,7 @@
 // Comprobación rápida antes de subir cambios.  Uso:  node scripts/comprobar.js
-// Revisa que el código de index.html, admin.html y worker.js no tenga errores de sintaxis.
+// Revisa que el código de app.js, admin.js y worker.js no tenga errores de
+// sintaxis, que las páginas no lleven código incrustado (lo bloquearía la
+// política de seguridad del navegador) y ejecuta las pruebas del worker.
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
@@ -7,22 +9,21 @@ const { execFileSync } = require("child_process");
 const raiz = path.join(__dirname, "..");
 let fallos = 0;
 
-for (const f of ["index.html", "admin.html"]) {
-  const html = fs.readFileSync(path.join(raiz, f), "utf8");
-  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-  scripts.forEach((m, i) => {
-    try { new Function(m[1]); console.log(`OK    ${f} (script ${i + 1})`); }
-    catch (e) { fallos++; console.error(`FALLO ${f} (script ${i + 1}): ${e.message}`); }
-  });
-  if (scripts.length === 0) { fallos++; console.error(`FALLO ${f}: no se encontró ningún <script>`); }
+for (const f of ["app.js", "admin.js", "worker.js"]) {
+  try {
+    execFileSync(process.execPath, ["--check", path.join(raiz, f)], { stdio: "pipe" });
+    console.log(`OK    ${f}`);
+  } catch (e) {
+    fallos++;
+    console.error(`FALLO ${f}: ` + String(e.stderr || e.message).split("\n").slice(0, 5).join("\n"));
+  }
 }
 
-try {
-  execFileSync(process.execPath, ["--check", path.join(raiz, "worker.js")], { stdio: "pipe" });
-  console.log("OK    worker.js");
-} catch (e) {
-  fallos++;
-  console.error("FALLO worker.js: " + String(e.stderr || e.message).split("\n").slice(0, 5).join("\n"));
+for (const [f, js] of [["index.html", "app.js"], ["admin.html", "admin.js"]]) {
+  const html = fs.readFileSync(path.join(raiz, f), "utf8");
+  if (/<script(?![^>]*\bsrc=)[^>]*>/.test(html)) { fallos++; console.error(`FALLO ${f}: tiene un <script> con código dentro; el código va en ${js}`); }
+  else if (!html.includes(`<script src="${js}`)) { fallos++; console.error(`FALLO ${f}: no carga ${js}`); }
+  else console.log(`OK    ${f}`);
 }
 
 // Pruebas automáticas del worker (seguridad, datos, copias de seguridad, emails)

@@ -12,18 +12,41 @@
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 días de sesión
 
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
+// Webs que pueden llamar a esta API desde un navegador. Si algún día la app
+// se muda a un dominio propio, hay que añadirlo aquí (y en el
+// Content-Security-Policy de index.html y admin.html).
+const ALLOWED_ORIGINS = ["https://adeangomez.github.io"];
+const LOCAL_ORIGIN_RE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/; // pruebas en tu propio ordenador
+
+function corsHeaders(request) {
+  const origin = (request && request.headers.get("Origin")) || "";
+  const headers = {
     "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Key",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin",
   };
+  if (ALLOWED_ORIGINS.includes(origin) || LOCAL_ORIGIN_RE.test(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+  return headers;
 }
+
+// Cabeceras de seguridad comunes a todas las respuestas (las de CORS se
+// añaden al final, en el "fetch" de abajo, según quién llame).
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "Cache-Control": "no-store",
+  "Referrer-Policy": "no-referrer",
+  "X-Frame-Options": "DENY",
+  "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+};
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json", ...corsHeaders() },
+    headers: { "Content-Type": "application/json; charset=utf-8", ...SECURITY_HEADERS },
   });
 }
 
@@ -43,8 +66,83 @@ function randomHex(bytes = 16) {
   return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function hashPassword(password, salt) {
+// ---- Contraseñas ----
+// Se guardan con PBKDF2 (miles de vueltas de SHA-256): si alguien llegara a
+// conseguir una copia de la base de datos, probar contraseñas le costaría
+// miles de veces más que con un SHA-256 simple. Las cuentas antiguas
+// (SHA-256 simple, sin campo "algo") siguen entrando y se actualizan solas
+// al nuevo formato la próxima vez que inician sesión.
+const PBKDF2_ALGO = "pbkdf2-sha256";
+const PBKDF2_ITERATIONS = 10000; // contenido a propósito: el plan gratuito de Workers da muy poco tiempo de CPU por petición
+
+async function legacyHashPassword(password, salt) {
   return sha256Hex(salt + ":" + password);
+}
+
+async function pbkdf2Hex(password, salt, iterations) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: enc.encode(salt), iterations }, key, 256);
+  return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Devuelve los campos de contraseña listos para guardar en la ficha del usuario.
+async function newPasswordFields(password) {
+  const salt = randomHex(16);
+  return { salt, hash: await pbkdf2Hex(password, salt, PBKDF2_ITERATIONS), algo: PBKDF2_ALGO, iter: PBKDF2_ITERATIONS };
+}
+
+function isLegacyHash(user) {
+  return !user || user.algo !== PBKDF2_ALGO;
+}
+
+async function verifyPassword(user, password) {
+  if (!user || typeof user.hash !== "string" || typeof user.salt !== "string") return false;
+  const iter = Math.max(1, Math.min(1000000, parseInt(user.iter, 10) || PBKDF2_ITERATIONS));
+  const hash = isLegacyHash(user)
+    ? await legacyHashPassword(password, user.salt)
+    : await pbkdf2Hex(password, user.salt, iter);
+  return safeEqual(hash, user.hash);
+}
+
+// ---- Límites de uso (para que nadie abuse de la IA, los emails, etc.) ----
+// Devuelve true si "key" ya ha llegado a "max" usos dentro de la ventana; si
+// no, suma uno y deja pasar.
+async function overLimit(env, key, max, windowSeconds) {
+  const n = await failCount(env, key);
+  if (n >= max) return true;
+  await env.ADEANFIT_KV.put(key, String(n + 1), { expirationTtl: windowSeconds });
+  return false;
+}
+const HOUR = 3600;
+const MAX_AI_CALLS_PER_HOUR = 20;      // por usuario (análisis + generar rutina)
+const MAX_EMAILS_PER_HOUR = 10;        // por usuario (informes enviados desde la app)
+const MAX_SUGGESTIONS_PER_DAY = 10;    // por usuario
+const MAX_BRIEF_LENGTH = 600;          // caracteres de la descripción para la IA
+const MAX_DATA_BYTES = 4 * 1024 * 1024; // tamaño máximo de los datos de un usuario (4 MB)
+const MAX_BODY_BYTES = 64 * 1024;       // tamaño máximo del resto de peticiones de usuario
+
+function tooManyRequests(what) {
+  return err(`Has llegado al límite de ${what} por ahora. Vuelve a intentarlo más tarde.`, 429);
+}
+
+const EMAIL_RE = /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/;
+function isValidEmail(s) {
+  return typeof s === "string" && s.length <= 254 && EMAIL_RE.test(s);
+}
+
+// La foto de perfil solo puede ser una imagen incrustada (data URL) normal.
+const AVATAR_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
+
+// Lee el cuerpo de la petición como JSON, con tope de tamaño. Devuelve null
+// si no es JSON válido o si se pasa del tope.
+async function readJson(request, maxBytes) {
+  const declared = parseInt(request.headers.get("Content-Length") || "0", 10) || 0;
+  if (declared > maxBytes) return null;
+  let text;
+  try { text = await request.text(); } catch (e) { return null; }
+  if (text.length > maxBytes) return null;
+  try { return JSON.parse(text); } catch (e) { return null; }
 }
 
 // ---- Protección contra adivinar contraseñas ----
@@ -102,8 +200,12 @@ function passwordProblem(pw) {
 }
 
 function normalizeUsername(u) {
-  return String(u || "").trim().toLowerCase();
+  return String(u || "").trim().toLowerCase().slice(0, 64);
 }
+
+// Nombres de usuario permitidos al CREAR cuentas: letras, números, espacio,
+// punto, guion y guion bajo. (Las cuentas que ya existan no se tocan.)
+const USERNAME_RE = /^[a-z0-9áéíóúüñç._ -]{2,40}$/;
 
 function newPlanId() {
   return "plan_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
@@ -278,23 +380,46 @@ async function getUserFromToken(env, request) {
   const auth = request.headers.get("Authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
   if (!token) return null;
-  const username = await env.ADEANFIT_KV.get("session:" + token);
-  if (!username) return null;
+  if (token.length > 128) return null;
+  const session = parseSession(await env.ADEANFIT_KV.get("session:" + token));
+  if (!session) return null;
+  const username = session.username;
   // Si el usuario ha sido suspendido, se corta el acceso aunque tenga sesión activa
   const raw = await env.ADEANFIT_KV.get("user:" + username);
   if (!raw) return null;
   const user = JSON.parse(raw);
   if (user.suspended) return null;
+  // Las sesiones abiertas antes del último cambio de contraseña (o de que la
+  // cuenta se volviera a crear) dejan de valer.
+  if (typeof user.sessionsValidFrom === "number" && session.issuedAt < user.sessionsValidFrom) return null;
   return username;
 }
 
-export default {
-  async fetch(request, env) {
+// Una sesión se guarda como {"u": usuario, "t": cuándo se abrió}. Las
+// sesiones antiguas guardaban solo el nombre de usuario (se siguen aceptando).
+function parseSession(raw) {
+  if (!raw) return null;
+  if (raw.charAt(0) === "{") {
+    try {
+      const o = JSON.parse(raw);
+      if (o && typeof o.u === "string") return { username: o.u, issuedAt: Number(o.t) || 0 };
+    } catch (e) {}
+  }
+  return { username: raw, issuedAt: 0 };
+}
+
+async function openSession(env, username) {
+  const token = randomHex(32);
+  await env.ADEANFIT_KV.put("session:" + token, JSON.stringify({ u: username, t: Date.now() }), { expirationTtl: TOKEN_TTL_SECONDS });
+  return token;
+}
+
+async function handleRequest(request, env) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
 
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders() });
+      return new Response(null, { status: 204 });
     }
 
     // ---------------------------------------------------------------
@@ -310,17 +435,17 @@ export default {
       const username = normalizeUsername(body.username);
       const password = String(body.password || "");
 
-      if (!username || username.length < 2) return err("Usuario inválido.");
+      if (!USERNAME_RE.test(username)) return err("Usuario inválido: usa entre 2 y 40 letras, números, espacios, puntos o guiones.");
       const pwProblem = passwordProblem(password);
       if (pwProblem) return err(pwProblem);
 
       const existing = await env.ADEANFIT_KV.get("user:" + username);
       if (existing) return err("Ese usuario ya existe.", 409);
 
-      const salt = randomHex(16);
-      const hash = await hashPassword(password, salt);
       await env.ADEANFIT_KV.put("user:" + username, JSON.stringify({
-        username, salt, hash, createdAt: new Date().toISOString()
+        username, ...(await newPasswordFields(password)), createdAt: new Date().toISOString(),
+        // Si existió antes una cuenta con este mismo nombre, sus sesiones viejas no valen para la nueva.
+        sessionsValidFrom: Date.now()
       }));
       // espacio de datos vacío inicial
       await env.ADEANFIT_KV.put("data:" + username, JSON.stringify({ plans: [], activePlanId: null, state: null }));
@@ -407,11 +532,11 @@ export default {
       if (!raw) return err("Usuario no encontrado.", 404);
       const user = JSON.parse(raw);
 
-      const salt = randomHex(16);
-      const hash = await hashPassword(newPassword, salt);
-      user.salt = salt;
-      user.hash = hash;
+      Object.assign(user, await newPasswordFields(newPassword));
+      // Cierra las sesiones que estuvieran abiertas con la contraseña anterior.
+      user.sessionsValidFrom = Date.now();
       await env.ADEANFIT_KV.put("user:" + username, JSON.stringify(user));
+      await env.ADEANFIT_KV.delete("fail:user:" + username);
 
       return json({ ok: true });
     }
@@ -697,24 +822,26 @@ export default {
     // Body: { "username": "...", "password": "..." }
     // ---------------------------------------------------------------
     if (path === "/login" && request.method === "POST") {
-      const body = await request.json().catch(() => ({}));
+      const body = (await readJson(request, MAX_BODY_BYTES)) || {};
       const username = normalizeUsername(body.username);
-      const password = String(body.password || "");
+      const password = String(body.password || "").slice(0, 200);
 
       const userFailKey = "fail:user:" + username;
       const ipFailKey = "fail:ip:" + clientIp(request);
       if ((await failCount(env, userFailKey)) >= MAX_LOGIN_FAILS_USER) return tooMany();
       if ((await failCount(env, ipFailKey)) >= MAX_LOGIN_FAILS_IP) return tooMany();
 
-      const raw = await env.ADEANFIT_KV.get("user:" + username);
+      const raw = username ? await env.ADEANFIT_KV.get("user:" + username) : null;
       if (!raw) {
+        // Mismo trabajo que con un usuario real, para que el tiempo de
+        // respuesta no delate qué nombres de usuario existen.
+        await pbkdf2Hex(password, "0000000000000000", PBKDF2_ITERATIONS);
         await addFail(env, ipFailKey);
         return err("Usuario o contraseña incorrectos.", 401);
       }
       const user = JSON.parse(raw);
 
-      const hash = await hashPassword(password, user.salt);
-      if (!safeEqual(hash, user.hash)) {
+      if (!(await verifyPassword(user, password))) {
         await addFail(env, userFailKey);
         await addFail(env, ipFailKey);
         return err("Usuario o contraseña incorrectos.", 401);
@@ -723,9 +850,14 @@ export default {
 
       if (user.suspended) return err("Tu cuenta está suspendida. Contacta con el administrador.", 403);
 
-      const token = randomHex(24);
-      await env.ADEANFIT_KV.put("session:" + token, username, { expirationTtl: TOKEN_TTL_SECONDS });
+      // Cuenta con el formato antiguo de contraseña: se pasa al nuevo ahora
+      // que sabemos cuál es (el usuario no nota nada).
+      if (isLegacyHash(user)) {
+        Object.assign(user, await newPasswordFields(password));
+        await env.ADEANFIT_KV.put("user:" + username, JSON.stringify(user));
+      }
 
+      const token = await openSession(env, username);
       return json({ ok: true, token, username });
     }
 
@@ -738,26 +870,37 @@ export default {
       const username = await getUserFromToken(env, request);
       if (!username) return err("No autenticado.", 401);
 
-      const body = await request.json().catch(() => ({}));
-      const oldPassword = String(body.oldPassword || "");
+      const body = (await readJson(request, MAX_BODY_BYTES)) || {};
+      const oldPassword = String(body.oldPassword || "").slice(0, 200);
       const newPassword = String(body.newPassword || "");
       const pwProblem = passwordProblem(newPassword);
       if (pwProblem) return err(pwProblem);
+
+      // Mismo freno que en el login: con una sesión robada no se puede
+      // probar la contraseña actual sin límite.
+      const pwFailKey = "fail:chpw:" + username;
+      if ((await failCount(env, pwFailKey)) >= MAX_LOGIN_FAILS_USER) return tooMany();
 
       const raw = await env.ADEANFIT_KV.get("user:" + username);
       if (!raw) return err("Usuario no encontrado.", 404);
       const user = JSON.parse(raw);
 
-      const oldHash = await hashPassword(oldPassword, user.salt);
-      if (oldHash !== user.hash) return err("La contraseña actual no es correcta.", 401);
+      if (!(await verifyPassword(user, oldPassword))) {
+        await addFail(env, pwFailKey);
+        // 403 y no 401: la sesión es válida, lo que falla es la contraseña
+        // (con 401 la app creería que la sesión ha caducado).
+        return err("La contraseña actual no es correcta.", 403);
+      }
+      await env.ADEANFIT_KV.delete(pwFailKey);
 
-      const newSalt = randomHex(16);
-      const newHash = await hashPassword(newPassword, newSalt);
-      user.salt = newSalt;
-      user.hash = newHash;
+      Object.assign(user, await newPasswordFields(newPassword));
+      // Cierra el resto de sesiones abiertas (otros dispositivos) y abre una
+      // nueva para este, que la app guarda en lugar de la anterior.
+      user.sessionsValidFrom = Date.now();
       await env.ADEANFIT_KV.put("user:" + username, JSON.stringify(user));
+      const token = await openSession(env, username);
 
-      return json({ ok: true });
+      return json({ ok: true, token });
     }
 
     // ---------------------------------------------------------------
@@ -766,7 +909,7 @@ export default {
     if (path === "/logout" && request.method === "POST") {
       const auth = request.headers.get("Authorization") || "";
       const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-      if (token) await env.ADEANFIT_KV.delete("session:" + token);
+      if (token && token.length <= 128) await env.ADEANFIT_KV.delete("session:" + token);
       return json({ ok: true });
     }
 
@@ -805,8 +948,15 @@ export default {
       const username = await getUserFromToken(env, request);
       if (!username) return err("No autenticado.", 401);
 
-      const body = await request.json().catch(() => null);
-      if (!body) return err("Datos inválidos.");
+      const declaredBytes = parseInt(request.headers.get("Content-Length") || "0", 10) || 0;
+      if (declaredBytes > MAX_DATA_BYTES) return err("Los datos ocupan demasiado para guardarse.", 413);
+      const bodyText = await request.text().catch(() => "");
+      if (bodyText.length > MAX_DATA_BYTES) return err("Los datos ocupan demasiado para guardarse.", 413);
+      let body = null;
+      try { body = JSON.parse(bodyText); } catch (e) {}
+      if (!body || typeof body !== "object" || Array.isArray(body)) return err("Datos inválidos.");
+      if (body.plans != null && !Array.isArray(body.plans)) return err("Datos inválidos.");
+      if (body.profile != null && (typeof body.profile !== "object" || Array.isArray(body.profile))) return err("Datos inválidos.");
 
       // Límite defensivo: la foto de perfil se manda en base64 dentro de
       // "profile.avatarBase64". El cliente ya la recorta y comprime antes de
@@ -815,6 +965,12 @@ export default {
       const AVATAR_MAX_BASE64_LENGTH = 400000; // ~300KB decodificado, de sobra para una foto de perfil pequeña
       if (body.profile && typeof body.profile.avatarBase64 === "string" && body.profile.avatarBase64.length > AVATAR_MAX_BASE64_LENGTH) {
         return err("La foto de perfil es demasiado grande. Prueba con otra imagen.", 413);
+      }
+      // ...y que sea de verdad una imagen incrustada y nada más (esa cadena
+      // acaba pintándose en la app y en el panel de administrador).
+      if (body.profile && body.profile.avatarBase64 != null && body.profile.avatarBase64 !== ""
+          && !(typeof body.profile.avatarBase64 === "string" && AVATAR_RE.test(body.profile.avatarBase64))) {
+        return err("La foto de perfil no tiene un formato válido. Prueba con otra imagen.", 400);
       }
 
       const currentRaw = await env.ADEANFIT_KV.get("data:" + username);
@@ -852,6 +1008,8 @@ export default {
       if (!env.AI) {
         return err("La IA no está conectada en el servidor: falta el binding 'AI' (Workers AI) en la configuración del Worker de Cloudflare.", 500);
       }
+
+      if (await overLimit(env, "rl:ai:" + username, MAX_AI_CALLS_PER_HOUR, HOUR)) return tooManyRequests("usos de la IA");
 
       const prompt = `Eres un entrenador personal experto y directo. A continuación tienes el registro de progreso de gimnasio de un usuario. Analiza cómo de bueno es su progreso reciente (¿mejora, se estanca, empeora?) y dale 3 recomendaciones concretas y accionables para mejorar. Responde en español, en un tono cercano pero profesional, en un máximo de 180 palabras, sin usar markdown ni asteriscos.
 
@@ -919,7 +1077,10 @@ function avoidConsecutiveSameMuscle(days) {
 // cliente concreto desde el panel). Devuelve { plan } o { errorMessage, status }.
 async function generatePlanWithAI(env, userBrief) {
   const FIXED_PREFIX = "Quiero una rutina de ejercicios enfocada en la eficiencia en crecimiento muscular, por lo que quiero que me hagas una rutina de: ";
-  const brief = FIXED_PREFIX + userBrief;
+  // Tope de longitud, y sin comillas ni saltos de línea: la descripción va
+  // entre comillas dentro de las instrucciones que recibe la IA.
+  const cleanBrief = String(userBrief).slice(0, MAX_BRIEF_LENGTH).replace(/["“”«»`\\]/g, "'").replace(/\s+/g, " ");
+  const brief = FIXED_PREFIX + cleanBrief;
 
   if (!env.AI) {
     return { errorMessage: "La IA no está conectada en el servidor: falta el binding 'AI' (Workers AI) en la configuración del Worker de Cloudflare.", status: 500 };
@@ -995,9 +1156,10 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       const username = await getUserFromToken(env, request);
       if (!username) return err("No autenticado.", 401);
 
-      const body = await request.json().catch(() => ({}));
+      const body = (await readJson(request, MAX_BODY_BYTES)) || {};
       const userBrief = String(body.brief || "").trim();
       if (!userBrief) return err("Describe qué tipo de rutina quieres.");
+      if (await overLimit(env, "rl:ai:" + username, MAX_AI_CALLS_PER_HOUR, HOUR)) return tooManyRequests("usos de la IA");
 
       const result = await generatePlanWithAI(env, userBrief);
       if (result.errorMessage) return err(result.errorMessage, result.status);
@@ -1013,10 +1175,12 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       const username = await getUserFromToken(env, request);
       if (!username) return err("No autenticado.", 401);
 
-      const body = await request.json().catch(() => ({}));
-      const name = String(body.name || "").trim().slice(0, 80);
-      const muscle = String(body.muscle || "").trim().slice(0, 40);
+      const body = (await readJson(request, MAX_BODY_BYTES)) || {};
+      const cleanText = v => String(v || "").replace(/[\u0000-\u001f\u007f<>]/g, " ").replace(/\s+/g, " ").trim();
+      const name = cleanText(body.name).slice(0, 80);
+      const muscle = cleanText(body.muscle).slice(0, 40);
       if (!name) return err("Escribe el nombre del ejercicio.");
+      if (await overLimit(env, "rl:sug:" + username, MAX_SUGGESTIONS_PER_DAY, 24 * HOUR)) return tooManyRequests("sugerencias");
 
       const id = "suggestion:" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
       await env.ADEANFIT_KV.put(id, JSON.stringify({
@@ -1081,6 +1245,7 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       const frequency = (data.profile && data.profile.progressEmail && data.profile.progressEmail.frequency) || "monthly";
       const to = overrideTo || (data.profile && data.profile.progressEmail && data.profile.progressEmail.email);
       if (!to) return err("Ese usuario no tiene un email configurado y no se indicó uno alternativo.");
+      if (!isValidEmail(to)) return err("Indica un email válido.");
 
       try {
         const html = buildProgressEmailHtml(username, data, frequency === "never" ? "monthly" : frequency);
@@ -1117,7 +1282,7 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
         if (!username) return err("No autenticado.", 401);
       }
 
-      const body = await request.json().catch(() => ({}));
+      const body = (await readJson(request, MAX_BODY_BYTES)) || {};
       if (isAdmin) {
         username = normalizeUsername(body.username);
         if (!username) return err("Usuario inválido.");
@@ -1125,6 +1290,9 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       const kind = fixedKind || String(body.kind || "");
       const to = String(body.to || "").trim();
       if (!to) return err("Indica a qué email quieres enviarlo.");
+      if (!isValidEmail(to)) return err("Indica un email válido.");
+      if (kind !== "day" && kind !== "exercise") return err("Tipo de informe no válido.");
+      if (!isAdmin && await overLimit(env, "rl:mail:" + username, MAX_EMAILS_PER_HOUR, HOUR)) return tooManyRequests("emails");
 
       const dataRaw = await env.ADEANFIT_KV.get("data:" + username);
       if (!dataRaw) return err("Ese usuario no existe o no tiene datos.", 404);
@@ -1133,14 +1301,14 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       try {
         let html, subject;
         if (kind === "day") {
-          const dayName = String(body.dayName || "").trim();
+          const dayName = String(body.dayName || "").trim().slice(0, 120);
           if (!dayName) return err("Falta el día de rutina.");
-          const sessionDate = body.sessionDate ? String(body.sessionDate).trim() : null;
-          const comment = isAdmin ? String(body.comment || "").trim() : "";
+          const sessionDate = body.sessionDate ? String(body.sessionDate).trim().slice(0, 40) : null;
+          const comment = isAdmin ? String(body.comment || "").trim().slice(0, 2000) : "";
           html = buildDayReportEmailHtml(username, data, dayName, comment, sessionDate);
           subject = isAdmin ? `Informe de entrenamiento — ${dayName} (${username})` : `Tu informe de entrenamiento — ${dayName}`;
         } else if (kind === "exercise") {
-          const exerciseName = String(body.exerciseName || "").trim();
+          const exerciseName = String(body.exerciseName || "").trim().slice(0, 120);
           if (!exerciseName) return err("Falta el ejercicio.");
           html = buildExerciseChartEmailHtml(username, data, exerciseName);
           subject = isAdmin ? `Progreso de ${username} — ${exerciseName}` : `Tu progreso — ${exerciseName}`;
@@ -1165,7 +1333,7 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
       const username = normalizeUsername(body.username);
       if (!username) return err("Usuario inválido.");
       const to = String(body.to || "").trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return err("Indica un email válido.");
+      if (!isValidEmail(to)) return err("Indica un email válido.");
       const startDate = String(body.startDate || "").trim();
       if (!isValidYmd(startDate)) return err("Elige el día desde el que quieres enviar las marcas.");
 
@@ -1239,6 +1407,21 @@ Reglas: entre 1 y 4 días. Entre 3 y ${EXERCISE_LIBRARY_NAMES.length} ejercicios
     }
 
     return err("Ruta no encontrada.", 404);
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    let res;
+    try {
+      res = await handleRequest(request, env);
+    } catch (e) {
+      // Nunca se devuelven detalles internos al navegador; quedan en el registro del Worker.
+      console.error("Error no controlado en " + request.method + " " + new URL(request.url).pathname, e && e.stack || e);
+      res = err("Error interno del servidor.", 500);
+    }
+    const out = new Response(res.body, res);
+    for (const [k, v] of Object.entries(corsHeaders(request))) out.headers.set(k, v);
+    return out;
   },
 
   // =====================================================================
@@ -1276,6 +1459,7 @@ async function maybeSendProgressEmail(env, username, force) {
   if (!settings || !settings.email || settings.frequency === "never") {
     return { sent: false, reason: "sin preferencia activa" };
   }
+  if (!isValidEmail(settings.email)) return { sent: false, reason: "email no válido" };
   if (!force) {
     const intervalDays = FREQUENCY_DAYS[settings.frequency];
     if (!intervalDays) return { sent: false, reason: "frecuencia desconocida" };
@@ -1288,8 +1472,16 @@ async function maybeSendProgressEmail(env, username, force) {
   const html = buildProgressEmailHtml(username, data, settings.frequency);
   await sendEmailViaResend(env, settings.email, "Tu progreso en ADEANEASYFIT", html);
 
-  data.profile.progressEmail.lastSentAt = new Date().toISOString();
-  await env.ADEANFIT_KV.put("data:" + username, JSON.stringify(data));
+  // Se relee justo antes de guardar y solo se toca la fecha de envío, para
+  // no pisar un entrenamiento que el usuario haya guardado mientras se
+  // preparaba y mandaba el email. No se sube "_rev": lo único que cambia es
+  // un dato que la app no edita.
+  const freshRaw = await env.ADEANFIT_KV.get("data:" + username);
+  const fresh = freshRaw ? JSON.parse(freshRaw) : data;
+  if (fresh.profile && fresh.profile.progressEmail) {
+    fresh.profile.progressEmail.lastSentAt = new Date().toISOString();
+    await env.ADEANFIT_KV.put("data:" + username, JSON.stringify(fresh));
+  }
   return { sent: true };
 }
 
@@ -2197,5 +2389,5 @@ async function buildClientExcel(username, data, startDate, imageFetcher) {
 }
 
 function escapeHtmlEmail(s) {
-  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
