@@ -1,0 +1,16 @@
+{
+  "name": "ADEANEASYFIT",
+  "short_name": "Adeanfit",
+  "description": "Registra tus entrenamientos, sigue tu rutina y mide tu progreso en el gimnasio.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0d10",
+  "theme_color": "#0c0d10",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
