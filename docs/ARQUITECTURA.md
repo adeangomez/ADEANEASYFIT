@@ -1,8 +1,11 @@
 # Arquitectura de ADEANEASYFIT
 
 ```
-index.html     App del cliente (PWA, todo el código en un solo archivo)
-admin.html     Panel del administrador / entrenador
+index.html     App del cliente: estructura y estilos
+app.js         Código de la app del cliente
+admin.html     Panel del administrador / entrenador: estructura y estilos
+admin.js       Código del panel
+manifest.webmanifest  Nombre e iconos para "Añadir a pantalla de inicio"
 assets/        Iconos, banner y fotos de la biblioteca de ejercicios (assets/ejercicios)
 worker.js      API en Cloudflare Workers (cuentas, datos, IA, emails)
 wrangler.toml  Configuración del Worker (base de datos KV, IA y tarea diaria)
